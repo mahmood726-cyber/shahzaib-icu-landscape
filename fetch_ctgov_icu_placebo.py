@@ -87,7 +87,7 @@ def normalize_text(value: Optional[str]) -> str:
 
 
 def extract_list(values: Optional[Iterable[str]]) -> List[str]:
-    return [normalize_text(v) for v in (values or []) if normalize_text(v)]
+    return [t for v in (values or []) if (t := normalize_text(v))]
 
 
 def is_placebo_text(text: str) -> bool:

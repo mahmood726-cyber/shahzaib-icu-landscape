@@ -91,7 +91,7 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
     ),
     (r"\bdyn(?:es)?\s*\*?\s*s\s*/\s*cm\^?5\b", "dyn*s/cm5"),
     (r"\bwatt(?:s)?\b", "W"),
-    (r"\bsec(?:onds)?\b", "s"),
+    (r"(?<!\w)(?:\d[\d.]*\s*)sec(?:onds)?(?!\w)", "s"),
 ]
 
 
@@ -271,7 +271,8 @@ def build_living_map(
     total_mentions = 0
     placebo_mentions = 0
 
-    with detailed_path.open("w", encoding="utf-8", newline="") as handle:
+    detailed_tmp = detailed_path.with_suffix(".csv.tmp")
+    with detailed_tmp.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=detailed_fields)
         writer.writeheader()
 
@@ -364,6 +365,8 @@ def build_living_map(
                 if has_placebo:
                     stats.placebo_study_ids.add(nct_id)
 
+    detailed_tmp.replace(detailed_path)
+
     total_studies = len(studies_map)
     studies_with_placebo = sum(
         1 for row in studies_rows if normalize_int(row.get("placebo_arm_count")) > 0
@@ -440,7 +443,9 @@ def build_living_map(
     summary["parquet"] = parquet_info
 
     summary_path = output_dir / f"icu_hemodynamic_summary{suffix}.json"
-    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    summary_tmp = summary_path.with_suffix(".json.tmp")
+    summary_tmp.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    summary_tmp.replace(summary_path)
 
     if dashboard_dir:
         dashboard_dir.mkdir(parents=True, exist_ok=True)

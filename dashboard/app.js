@@ -121,7 +121,7 @@ const buildDetailIndex = (rows) => {
       normalizedKeyword,
       normalizedUnit,
       row.outcome_type,
-    ].join("|");
+    ].join("\0");
     if (!index[nctId]._outcomeKeys.has(outcomeKey)) {
       index[nctId].outcomes.push({
         measure: row.measure || "",
@@ -703,6 +703,8 @@ const revealSections = () => {
 const onDatasetChange = async (datasetKey) => {
   currentDataset = datasetKey;
   updateDownloadLinks(datasetKey);
+  const prevError = document.getElementById("datasetError");
+  if (prevError) prevError.remove();
   const data = await loadDataset(datasetKey);
   renderSummary(data.summary);
   updateFocusOptions(
