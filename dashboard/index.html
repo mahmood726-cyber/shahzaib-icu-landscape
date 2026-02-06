@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hemodynamic Evidence Atlas</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1" aria-hidden="true"></div>
+  <div class="bg-orb orb-2" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <main class="shell">
+    <header class="hero reveal">
+      <div class="hero-text">
+        <p class="kicker">ICU RCT Living Map</p>
+        <h1>Hemodynamic Evidence Atlas</h1>
+        <p class="lead">
+          A living snapshot of critical care randomized trials with hemodynamic outcomes,
+          highlighting placebo-arm signals and outcome patterns across ICU conditions.
+        </p>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-card">
+          <p class="meta-label">Last generated</p>
+          <p class="meta-value" id="generatedAt">Loading...</p>
+        </div>
+        <div class="meta-card">
+          <p class="meta-label">Data</p>
+          <a class="meta-link" id="downloadCsv" href="data/icu_hemodynamic_living_map.csv">Download living map CSV</a>
+          <a class="meta-link" id="downloadSummary" href="data/icu_hemodynamic_summary.json">Download summary JSON</a>
+        </div>
+        <div class="meta-card">
+          <p class="meta-label">Dataset</p>
+          <div class="select-wrap">
+            <select id="datasetSelect">
+              <option value="broad">All ICU RCTs</option>
+              <option value="placebo">Placebo-arm subset</option>
+            </select>
+          </div>
+          <p class="meta-note">Switch updates stats and explorer data.</p>
+        </div>
+      </div>
+    </header>
+
+    <section class="cards reveal">
+      <div class="card">
+        <p class="card-label" id="totalStudiesLabel">Total ICU RCTs</p>
+        <p class="card-value" id="totalStudies">0</p>
+        <p class="card-caption">Randomized ICU/critical care trials in scope.</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Trials with hemodynamics</p>
+        <p class="card-value" id="hemoStudies">0</p>
+        <p class="card-caption">Trials with hemodynamic outcome mentions.</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Placebo-arm trials</p>
+        <p class="card-value" id="placeboStudies">0</p>
+        <p class="card-caption">Trials listing placebo/sham/usual care arms.</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Hemo + placebo trials</p>
+        <p class="card-value" id="hemoPlaceboStudies">0</p>
+        <p class="card-caption">Trials with both hemodynamic outcomes and placebo arms.</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Hemodynamic mentions</p>
+        <p class="card-value" id="totalMentions">0</p>
+        <p class="card-caption">Total outcome mentions tied to hemodynamics.</p>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-header">
+        <h2>Signal map</h2>
+        <p>Top hemodynamic keywords and the ICU conditions they appear in.</p>
+      </div>
+      <div class="focus-bar">
+        <label>
+          Condition focus
+          <select id="focusCondition">
+            <option value="">All conditions</option>
+          </select>
+        </label>
+        <p class="focus-stats" id="focusStats">Showing all conditions.</p>
+      </div>
+      <div class="split">
+        <div class="panel">
+          <h3>Top hemodynamic keywords</h3>
+          <div class="bar-list" id="keywordBars"></div>
+        </div>
+        <div class="panel">
+          <h3>Top ICU conditions</h3>
+          <div class="bar-list" id="conditionBars"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-header">
+        <h2>Outcome types</h2>
+        <p>Primary vs secondary vs other outcome emphasis.</p>
+      </div>
+      <div class="panel wide">
+        <div class="bar-list" id="outcomeBars"></div>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-header">
+        <h2>Placebo signal</h2>
+        <p>How much of the hemodynamic signal comes from trials with placebo arms.</p>
+      </div>
+      <div class="panel wide">
+        <div class="ratio" id="placeboRatio">
+          <div class="ratio-bar" id="placeboRatioBar"></div>
+        </div>
+        <div class="ratio-labels">
+          <span id="placeboMentions">0</span>
+          <span id="nonPlaceboMentions">0</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-header">
+        <h2>Explorer</h2>
+        <p>Filter hemodynamic mentions by keyword, condition, outcome type, or placebo status.</p>
+      </div>
+      <div class="panel wide">
+        <div class="filters">
+          <label>
+            Keyword
+            <input id="keywordFilter" type="text" placeholder="e.g., MAP, lactate" />
+          </label>
+          <label>
+            Condition
+            <input id="conditionFilter" type="text" placeholder="e.g., sepsis, shock" />
+          </label>
+          <label>
+            Outcome type
+            <select id="outcomeFilter">
+              <option value="">All outcome types</option>
+            </select>
+          </label>
+          <label>
+            Unit
+            <select id="unitFilter">
+              <option value="">All units</option>
+            </select>
+          </label>
+          <label class="checkbox">
+            <input id="placeboOnly" type="checkbox" />
+            Placebo-arm only
+          </label>
+          <label>
+            Sort by
+            <select id="sortBy">
+              <option value="nct_id">NCT ID</option>
+              <option value="measure">Measure</option>
+              <option value="normalized_keyword">Normalized keyword</option>
+              <option value="normalized_unit">Unit</option>
+              <option value="outcome_type">Outcome type</option>
+              <option value="has_placebo_arm">Placebo flag</option>
+            </select>
+          </label>
+          <label>
+            Direction
+            <select id="sortDir">
+              <option value="asc">A → Z</option>
+              <option value="desc">Z → A</option>
+            </select>
+          </label>
+          <label>
+            Rows
+            <select id="rowLimit">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="250">250</option>
+              <option value="500">500</option>
+            </select>
+          </label>
+          <button class="export-btn" id="exportCsv" type="button">Download filtered CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="results-table" id="resultsTable">
+            <thead>
+              <tr>
+                <th>NCT ID</th>
+                <th>Measure</th>
+                <th>Normalized</th>
+                <th>Keyword</th>
+                <th>Unit</th>
+                <th>Outcome</th>
+                <th>Placebo</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="detail-panel" id="trialDetail">
+          <div class="detail-header">
+            <h3 id="detailTitle">Select a trial row to see details</h3>
+            <a id="detailLink" href="#" target="_blank" rel="noreferrer">ClinicalTrials.gov</a>
+          </div>
+          <div class="detail-grid">
+            <div>
+              <p class="detail-label">NCT ID</p>
+              <p class="detail-value" id="detailNct">-</p>
+            </div>
+            <div>
+              <p class="detail-label">Status</p>
+              <p class="detail-value" id="detailStatus">-</p>
+            </div>
+            <div>
+              <p class="detail-label">Phase</p>
+              <p class="detail-value" id="detailPhase">-</p>
+            </div>
+            <div>
+              <p class="detail-label">Conditions</p>
+              <p class="detail-value" id="detailConditions">-</p>
+            </div>
+          </div>
+          <div class="detail-lists">
+            <div>
+              <p class="detail-label">Arms</p>
+              <ul id="detailArms" class="detail-list"></ul>
+            </div>
+            <div>
+              <p class="detail-label">Hemodynamic outcomes</p>
+              <ul id="detailOutcomes" class="detail-list"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-header">
+        <h2>Notes</h2>
+        <p>Hemodynamic keywords are detected in outcome text; counts are mention-based.</p>
+      </div>
+      <div class="panel wide">
+        <p class="note">
+          If you open this file directly and charts are empty, run a local server from
+          the dashboard folder: <span class="code">python -m http.server 8000</span>.
+        </p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Built from ClinicalTrials.gov ICU RCT exports.</p>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
