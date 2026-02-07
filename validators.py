@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+"""
+TruthCert validators for the ICU Living Map pipeline.
+
+13 validation rules across three severity classes:
+  P0 (Block)  — hard failures that invalidate the capsule
+  P1 (Warn)   — quality concerns that degrade the badge
+  P2 (Info)   — informational checks logged for provenance
+"""
+from __future__ import annotations
+
+import csv
+import re
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+
+@dataclass
+class ValidationResult:
+    rule_id: str
+    severity: str  # "P0", "P1", "P2"
+    passed: bool
+    message: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+# ── Expected CSV headers ─────────────────────────────────────────────
+
+STUDIES_COLUMNS = [
+    "nct_id", "brief_title", "official_title", "overall_status", "study_type",
+    "allocation", "primary_purpose", "intervention_model", "masking",
+    "masking_description", "masking_subjects", "phase", "start_date",
+    "completion_date", "last_update_posted", "results_first_posted",
+    "has_results", "enrollment_count", "enrollment_type", "conditions",
+    "keywords", "arm_count", "placebo_arm_count", "outcome_count",
+    "hemo_outcome_count", "updated_since", "query_name",
+]
+
+HEMO_COLUMNS = [
+    "nct_id", "outcome_type", "measure", "keyword", "matched_text", "query_name",
+]
+
+OUTPUT_COLUMNS = [
+    "nct_id", "brief_title", "overall_status", "allocation",
+    "intervention_model", "masking", "masking_description", "masking_subjects",
+    "phase", "start_date", "completion_date", "last_update_posted",
+    "results_first_posted", "enrollment_count", "enrollment_type",
+    "conditions", "study_keywords", "arm_count", "placebo_arm_count",
+    "has_placebo_arm", "outcome_type", "measure", "keyword",
+    "normalized_keyword", "unit_raw", "normalized_unit", "matched_text",
+    "query_name",
+]
+
+SUMMARY_TOTAL_FIELDS = [
+    "total_studies", "studies_with_placebo", "studies_with_hemo_mentions",
+    "studies_with_hemo_and_placebo", "total_hemo_mentions",
+    "placebo_hemo_mentions", "non_placebo_hemo_mentions",
+]
+
+_NCT_RE = re.compile(r"^NCT\d{8}$")
+
+
+def _read_csv_header(path: Path) -> Optional[List[str]]:
+    """Return the header row of a CSV file, or None if file is missing/empty."""
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.reader(fh)
+        try:
+            return next(reader)
+        except StopIteration:
+            return None
+
+
+def _read_csv_column(path: Path, column: str, max_rows: int = 500) -> List[str]:
+    """Read up to max_rows values from a single CSV column."""
+    values: List[str] = []
+    if not path.exists():
+        return values
+    with path.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        for i, row in enumerate(reader):
+            if i >= max_rows:
+                break
+            val = row.get(column, "").strip()
+            if val:
+                values.append(val)
+    return values
+
+
+# ── P0 validators (Block) ────────────────────────────────────────────
+
+def validate_schema_studies(studies_csv: Path) -> ValidationResult:
+    """P0-schema-studies: Verify studies CSV has the expected header columns."""
+    header = _read_csv_header(studies_csv)
+    if header is None:
+        return ValidationResult("P0-schema-studies", "P0", False,
+                                f"Studies CSV not found or empty: {studies_csv}")
+    missing = [c for c in STUDIES_COLUMNS if c not in header]
+    if missing:
+        return ValidationResult("P0-schema-studies", "P0", False,
+                                f"Missing columns in studies CSV: {missing}")
+    return ValidationResult("P0-schema-studies", "P0", True,
+                            f"Studies CSV has all {len(STUDIES_COLUMNS)} expected columns")
+
+
+def validate_schema_hemo(hemo_csv: Path) -> ValidationResult:
+    """P0-schema-hemo: Verify hemodynamic mentions CSV has the expected header."""
+    header = _read_csv_header(hemo_csv)
+    if header is None:
+        return ValidationResult("P0-schema-hemo", "P0", False,
+                                f"Hemo CSV not found or empty: {hemo_csv}")
+    missing = [c for c in HEMO_COLUMNS if c not in header]
+    if missing:
+        return ValidationResult("P0-schema-hemo", "P0", False,
+                                f"Missing columns in hemo CSV: {missing}")
+    return ValidationResult("P0-schema-hemo", "P0", True,
+                            f"Hemo CSV has all {len(HEMO_COLUMNS)} expected columns")
+
+
+def validate_schema_output(output_csv: Path) -> ValidationResult:
+    """P0-schema-output: Verify output living map CSV has the expected header."""
+    header = _read_csv_header(output_csv)
+    if header is None:
+        return ValidationResult("P0-schema-output", "P0", False,
+                                f"Output CSV not found or empty: {output_csv}")
+    missing = [c for c in OUTPUT_COLUMNS if c not in header]
+    if missing:
+        return ValidationResult("P0-schema-output", "P0", False,
+                                f"Missing columns in output CSV: {missing}")
+    return ValidationResult("P0-schema-output", "P0", True,
+                            f"Output CSV has all {len(OUTPUT_COLUMNS)} expected columns")
+
+
+def validate_summary_totals(summary: Dict[str, Any]) -> ValidationResult:
+    """P0-summary-totals: All 7 total fields present and non-negative integers."""
+    totals = summary.get("totals", {})
+    problems: List[str] = []
+    for field in SUMMARY_TOTAL_FIELDS:
+        val = totals.get(field)
+        if val is None:
+            problems.append(f"{field} missing")
+        elif not isinstance(val, int) or val < 0:
+            problems.append(f"{field}={val} (not non-negative int)")
+    if problems:
+        return ValidationResult("P0-summary-totals", "P0", False,
+                                f"Summary totals issues: {'; '.join(problems)}")
+    return ValidationResult("P0-summary-totals", "P0", True,
+                            "All 7 summary total fields are valid non-negative integers")
+
+
+def validate_nct_format(output_csv: Path) -> ValidationResult:
+    """P0-nct-format: ALL NCT IDs match NCT\\d{8} pattern (V-7)."""
+    nct_ids = _read_csv_column(output_csv, "nct_id", max_rows=50_000)
+    if not nct_ids:
+        return ValidationResult("P0-nct-format", "P0", False,
+                                "No NCT IDs found in output CSV")
+    bad = [nid for nid in nct_ids if not _NCT_RE.match(nid)]
+    if bad:
+        sample = bad[:5]
+        return ValidationResult("P0-nct-format", "P0", False,
+                                f"{len(bad)} malformed NCT IDs (sample: {sample})")
+    return ValidationResult("P0-nct-format", "P0", True,
+                            f"All {len(nct_ids)} sampled NCT IDs are valid")
+
+
+def validate_total_consistency(summary: Dict[str, Any]) -> ValidationResult:
+    """P0-total-consistency: total_hemo == placebo_hemo + non_placebo_hemo."""
+    totals = summary.get("totals", {})
+    total = totals.get("total_hemo_mentions", 0)
+    placebo = totals.get("placebo_hemo_mentions", 0)
+    non_placebo = totals.get("non_placebo_hemo_mentions", 0)
+    if total != placebo + non_placebo:
+        return ValidationResult(
+            "P0-total-consistency", "P0", False,
+            f"total_hemo_mentions({total}) != placebo({placebo}) + non_placebo({non_placebo})")
+    return ValidationResult("P0-total-consistency", "P0", True,
+                            f"Mention totals consistent: {total} = {placebo} + {non_placebo}")
+
+
+# ── P1 validators (Warn) ─────────────────────────────────────────────
+
+def validate_keyword_coverage(summary: Dict[str, Any], config_keywords: List[str]) -> ValidationResult:
+    """P1-keyword-coverage: >=80% of config keywords appear in normalized_keywords."""
+    found = {item["keyword"] for item in summary.get("normalized_keywords", [])}
+    if not config_keywords:
+        return ValidationResult("P1-keyword-coverage", "P1", True,
+                                "No config keywords to check")
+    present = sum(1 for kw in config_keywords if kw in found)
+    ratio = present / len(config_keywords)
+    passed = ratio >= 0.80
+    return ValidationResult(
+        "P1-keyword-coverage", "P1", passed,
+        f"{present}/{len(config_keywords)} config keywords found ({ratio:.0%}); threshold 80%")
+
+
+def validate_normalization_coverage(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-normalization-coverage: <=5% of normalized keywords are 'Unmapped'."""
+    keywords = summary.get("normalized_keywords", [])
+    total_mentions = sum(item.get("mention_count", 0) for item in keywords)
+    unmapped_mentions = sum(
+        item.get("mention_count", 0) for item in keywords
+        if item.get("keyword", "").lower() == "unmapped"
+    )
+    if total_mentions == 0:
+        return ValidationResult("P1-normalization-coverage", "P1", True,
+                                "No keyword mentions to evaluate")
+    ratio = unmapped_mentions / total_mentions
+    passed = ratio <= 0.05
+    return ValidationResult(
+        "P1-normalization-coverage", "P1", passed,
+        f"{unmapped_mentions}/{total_mentions} mentions unmapped ({ratio:.1%}); threshold 5%")
+
+
+def validate_unit_coverage(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-unit-coverage: <=40% of mentions have empty/Unspecified units."""
+    units = summary.get("units", [])
+    total_mentions = sum(item.get("mention_count", 0) for item in units)
+    unspecified = sum(
+        item.get("mention_count", 0) for item in units
+        if item.get("unit", "").lower() in ("", "unspecified")
+    )
+    if total_mentions == 0:
+        return ValidationResult("P1-unit-coverage", "P1", True,
+                                "No unit mentions to evaluate")
+    ratio = unspecified / total_mentions
+    passed = ratio <= 0.40
+    return ValidationResult(
+        "P1-unit-coverage", "P1", passed,
+        f"{unspecified}/{total_mentions} mentions unspecified ({ratio:.1%}); threshold 40%")
+
+
+def validate_empty_summary_sections(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-empty-summary-sections: All 5 list sections (keywords, normalized_keywords,
+    units, outcome_types, conditions) are non-empty."""
+    sections = ["keywords", "normalized_keywords", "units", "outcome_types", "conditions"]
+    empty = [s for s in sections if not summary.get(s)]
+    if empty:
+        return ValidationResult("P1-empty-summary-sections", "P1", False,
+                                f"Empty summary sections: {empty}")
+    return ValidationResult("P1-empty-summary-sections", "P1", True,
+                            "All 5 summary sections are non-empty")
+
+
+# ── P2 validators (Info) ─────────────────────────────────────────────
+
+def validate_ontology_version_logged(ontology_version: Optional[str]) -> ValidationResult:
+    """P2-ontology-version-logged: Ontology version string is present."""
+    if ontology_version:
+        return ValidationResult("P2-ontology-version-logged", "P2", True,
+                                f"Ontology version: {ontology_version[:24]}...")
+    return ValidationResult("P2-ontology-version-logged", "P2", False,
+                            "Ontology version not computed")
+
+
+def validate_raw_input_hashed(input_hashes: Dict[str, str]) -> ValidationResult:
+    """P2-raw-input-hashed: At least one raw input file hash is recorded."""
+    if input_hashes:
+        return ValidationResult("P2-raw-input-hashed", "P2", True,
+                                f"{len(input_hashes)} input file(s) hashed")
+    return ValidationResult("P2-raw-input-hashed", "P2", False,
+                            "No input file hashes recorded")
+
+
+def validate_parquet_generated(summary: Dict[str, Any]) -> ValidationResult:
+    """P2-parquet-generated: Parquet export succeeded."""
+    parquet = summary.get("parquet", {})
+    if parquet.get("status") == "ok":
+        return ValidationResult("P2-parquet-generated", "P2", True,
+                                f"Parquet generated via {parquet.get('method', '?')}")
+    return ValidationResult("P2-parquet-generated", "P2", False,
+                            f"Parquet not generated: {parquet.get('reason', 'unknown')}")
+
+
+# ── Enrichment validators (only run when enrichment present) ────────
+
+def validate_enrichment_coverage(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-enrichment-coverage: >=30% of hemo-trial NCT IDs have linked publications."""
+    enrichment = summary.get("enrichment", {})
+    if not enrichment.get("enabled"):
+        return ValidationResult("P1-enrichment-coverage", "P1", True,
+                                "Enrichment not enabled — skipped")
+    enriched = enrichment.get("enriched_trials", 0)
+    totals = summary.get("totals", {})
+    total_hemo = totals.get("studies_with_hemo_mentions", 0)
+    if total_hemo == 0:
+        return ValidationResult("P1-enrichment-coverage", "P1", True,
+                                "No hemo trials to check")
+    ratio = enriched / total_hemo
+    passed = ratio >= 0.30
+    return ValidationResult(
+        "P1-enrichment-coverage", "P1", passed,
+        f"{enriched}/{total_hemo} trials enriched ({ratio:.0%}); threshold 30%")
+
+
+def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult:
+    """P1-enrichment-staleness: Oldest enrichment record < 60 days."""
+    if enrich_db is None or not enrich_db.exists():
+        return ValidationResult("P1-enrichment-staleness", "P1", True,
+                                "No enrichment DB — skipped")
+    import sqlite3
+    from datetime import datetime, timezone
+    try:
+        conn = sqlite3.connect(str(enrich_db))
+        conn.execute("PRAGMA journal_mode=WAL")
+        row = conn.execute(
+            "SELECT MIN(fetched_utc) FROM enrichment_log WHERE status = 'ok'"
+        ).fetchone()
+        conn.close()
+    except sqlite3.DatabaseError as exc:
+        return ValidationResult("P1-enrichment-staleness", "P1", False,
+                                f"Enrichment DB error: {exc}")
+
+    if row is None or row[0] is None:
+        return ValidationResult("P1-enrichment-staleness", "P1", True,
+                                "No enrichment records to check")
+    try:
+        oldest = datetime.fromisoformat(row[0])
+        if oldest.tzinfo is None:
+            oldest = oldest.replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(timezone.utc) - oldest).total_seconds() / 86400
+    except (ValueError, TypeError):
+        return ValidationResult("P1-enrichment-staleness", "P1", False,
+                                "Cannot parse oldest enrichment timestamp")
+
+    passed = age_days < 60
+    return ValidationResult(
+        "P1-enrichment-staleness", "P1", passed,
+        f"Oldest enrichment record is {age_days:.0f} days old; threshold 60 days")
+
+
+def validate_enrichment_source_diversity(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-enrichment-source-diversity: >=3 of 8 sources contributed data."""
+    enrichment = summary.get("enrichment", {})
+    if not enrichment.get("enabled"):
+        return ValidationResult("P1-enrichment-source-diversity", "P1", True,
+                                "Enrichment not enabled — skipped")
+    coverage = enrichment.get("source_coverage", {})
+    active_sources = sum(1 for v in coverage.values() if v > 0)
+    passed = active_sources >= 3
+    return ValidationResult(
+        "P1-enrichment-source-diversity", "P1", passed,
+        f"{active_sources} active sources; threshold 3")
+
+
+def validate_enrichment_db_exists(enrich_db: Optional[Path]) -> ValidationResult:
+    """P2-enrichment-db-exists: SQLite file exists and is readable."""
+    if enrich_db is None:
+        return ValidationResult("P2-enrichment-db-exists", "P2", True,
+                                "No enrichment DB path specified — skipped")
+    if enrich_db.exists():
+        size_kb = enrich_db.stat().st_size / 1024
+        return ValidationResult("P2-enrichment-db-exists", "P2", True,
+                                f"Enrichment DB exists ({size_kb:.0f} KB)")
+    return ValidationResult("P2-enrichment-db-exists", "P2", False,
+                            f"Enrichment DB not found: {enrich_db}")
+
+
+def validate_enrichment_hashes(enrich_db: Optional[Path]) -> ValidationResult:
+    """P2-enrichment-hashes: At least one source hash recorded in DB."""
+    if enrich_db is None or not enrich_db.exists():
+        return ValidationResult("P2-enrichment-hashes", "P2", True,
+                                "No enrichment DB — skipped")
+    import sqlite3
+    try:
+        conn = sqlite3.connect(str(enrich_db))
+        conn.execute("PRAGMA journal_mode=WAL")
+        row = conn.execute("SELECT COUNT(*) FROM source_hashes").fetchone()
+        conn.close()
+    except sqlite3.DatabaseError as exc:
+        return ValidationResult("P2-enrichment-hashes", "P2", False,
+                                f"Enrichment DB error: {exc}")
+    count = row[0] if row else 0
+    passed = count > 0
+    return ValidationResult(
+        "P2-enrichment-hashes", "P2", passed,
+        f"{count} source hash(es) recorded")
+
+
+# ── Orchestrator ──────────────────────────────────────────────────────
+
+def run_validators(
+    studies_csv: Path,
+    hemo_csv: Path,
+    output_csv: Path,
+    summary: Dict[str, Any],
+    ontology_version: Optional[str],
+    input_hashes: Dict[str, str],
+    config_keywords: Optional[List[str]] = None,
+    enrich_db: Optional[Path] = None,
+) -> List[ValidationResult]:
+    """Run all validators and return the results."""
+    if config_keywords is None:
+        config_keywords = []
+
+    results: List[ValidationResult] = [
+        # P0 — Block
+        validate_schema_studies(studies_csv),
+        validate_schema_hemo(hemo_csv),
+        validate_schema_output(output_csv),
+        validate_summary_totals(summary),
+        validate_nct_format(output_csv),
+        validate_total_consistency(summary),
+        # P1 — Warn
+        validate_keyword_coverage(summary, config_keywords),
+        validate_normalization_coverage(summary),
+        validate_unit_coverage(summary),
+        validate_empty_summary_sections(summary),
+        # P2 — Info
+        validate_ontology_version_logged(ontology_version),
+        validate_raw_input_hashed(input_hashes),
+        validate_parquet_generated(summary),
+    ]
+
+    # Enrichment validators (only when enrichment data is present)
+    enrichment = summary.get("enrichment", {})
+    if enrichment.get("enabled"):
+        results.extend([
+            validate_enrichment_coverage(summary),
+            validate_enrichment_staleness(enrich_db),
+            validate_enrichment_source_diversity(summary),
+            validate_enrichment_db_exists(enrich_db),
+            validate_enrichment_hashes(enrich_db),
+        ])
+
+    return results

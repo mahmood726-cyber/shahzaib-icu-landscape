@@ -36,9 +36,19 @@ if ($UpdatedSince) {
     Assert-ExitCode "fetch placebo"
 }
 
-python "$root\build_living_map.py"
+Write-Host "Running enrichment..."
+try {
+    python "$root\enrich_orchestrator.py" --studies "$root\output\icu_rct_broad_studies.csv"
+    if ($LASTEXITCODE -ne 0) { Write-Warning "Enrichment (broad) failed (exit code $LASTEXITCODE) — continuing" }
+    python "$root\enrich_orchestrator.py" --studies "$root\output\icu_rct_placebo_studies.csv"
+    if ($LASTEXITCODE -ne 0) { Write-Warning "Enrichment (placebo) failed (exit code $LASTEXITCODE) — continuing" }
+} catch {
+    Write-Warning "Enrichment step failed: $_ — continuing without enrichment"
+}
+
+python "$root\build_living_map.py" --raw-jsonl "$root\raw\icu_rct_broad_studies.jsonl" --enrich
 Assert-ExitCode "build living map (broad)"
-python "$root\build_living_map.py" --studies "$root\output\icu_rct_placebo_studies.csv" --hemo "$root\output\icu_rct_placebo_hemodynamic_mentions.csv" --label placebo
+python "$root\build_living_map.py" --studies "$root\output\icu_rct_placebo_studies.csv" --hemo "$root\output\icu_rct_placebo_hemodynamic_mentions.csv" --label placebo --raw-jsonl "$root\raw\icu_rct_placebo_studies.jsonl" --enrich
 Assert-ExitCode "build living map (placebo)"
 
 Copy-Item -Path "$root\output\icu_rct_broad_arms.csv" -Destination "$root\dashboard\data\icu_rct_broad_arms.csv" -Force
@@ -46,7 +56,8 @@ Copy-Item -Path "$root\output\icu_rct_placebo_arms.csv" -Destination "$root\dash
 
 Write-Host "Writing output manifest..."
 $manifestPath = Join-Path $root "output\manifest.json"
-$files = Get-ChildItem -Path (Join-Path $root "output") -File | Where-Object { $_.Extension -in ".csv",".json",".parquet" -and $_.Name -ne "manifest.json" }
+$manifestTmp = "$manifestPath.tmp"
+$files = Get-ChildItem -Path (Join-Path $root "output") -Recurse -File | Where-Object { $_.Extension -in ".csv",".json",".parquet",".jsonl" -and $_.Name -ne "manifest.json" -and $_.Name -notlike "*.tmp" }
 $manifest = $files | ForEach-Object {
     [pscustomobject]@{
         path = $_.FullName
@@ -55,7 +66,8 @@ $manifest = $files | ForEach-Object {
         modified_utc = $_.LastWriteTimeUtc.ToString("o")
     }
 }
-$manifest | ConvertTo-Json -Depth 3 | Set-Content -Path $manifestPath
+$manifest | ConvertTo-Json -Depth 3 | Set-Content -Path $manifestTmp
+Move-Item -Path $manifestTmp -Destination $manifestPath -Force
 
 Write-Host "Refresh complete."
 

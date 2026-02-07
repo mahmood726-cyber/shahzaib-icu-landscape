@@ -4,12 +4,16 @@ const datasetConfig = {
     summary: "data/icu_hemodynamic_summary.json",
     map: "data/icu_hemodynamic_living_map.csv",
     arms: "data/icu_rct_broad_arms.csv",
+    capsule: "data/capsule.json",
+    enrichment: "data/enrichment_summary.json",
   },
   placebo: {
     label: "Placebo-arm subset",
     summary: "data/icu_hemodynamic_summary_placebo.json",
     map: "data/icu_hemodynamic_living_map_placebo.csv",
     arms: "data/icu_rct_placebo_arms.csv",
+    capsule: "data/capsule_placebo.json",
+    enrichment: "data/enrichment_summary_placebo.json",
   },
 };
 
@@ -18,23 +22,28 @@ const formatNumber = (value) => {
   return Number.isFinite(num) ? num.toLocaleString("en-US") : "0";
 };
 
+const sanitizeCssClass = (name) =>
+  String(name || "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+
 const sortByMentions = (items, key) =>
   [...items].sort((a, b) => (b[key] || 0) - (a[key] || 0));
 
 const parseCsv = (text) => {
   // RFC 4180 compliant parser: handles quoted fields with embedded
   // newlines, commas, and escaped double quotes.
+  // Strip BOM if present (common in Excel-exported CSVs)
+  const cleaned = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const rows = [];
   let row = [];
   let current = "";
   let inQuotes = false;
-  const len = text.length;
+  const len = cleaned.length;
 
   for (let i = 0; i < len; i += 1) {
-    const char = text[i];
+    const char = cleaned[i];
     if (inQuotes) {
       if (char === '"') {
-        if (i + 1 < len && text[i + 1] === '"') {
+        if (i + 1 < len && cleaned[i + 1] === '"') {
           current += '"';
           i += 1;
         } else {
@@ -282,6 +291,109 @@ const fetchCsv = async (path) => {
   return response.text();
 };
 
+const loadCapsule = async (path) => {
+  if (!path) return null;
+  try {
+    return await fetchJson(path);
+  } catch {
+    return null;
+  }
+};
+
+const renderBadge = (capsule) => {
+  const pill = document.getElementById("badgePill");
+  const capsuleId = document.getElementById("badgeCapsuleId");
+  const pipelineVer = document.getElementById("badgePipelineVersion");
+  const reasonsEl = document.getElementById("badgeReasons");
+  const validatorsEl = document.getElementById("badgeValidators");
+  const driftEl = document.getElementById("badgeDrift");
+  const abstentionsEl = document.getElementById("badgeAbstentions");
+  const extraEl = document.getElementById("badgeExtra");
+
+  if (!capsule) {
+    pill.textContent = "--";
+    pill.className = "badge-pill badge-none";
+    capsuleId.textContent = "";
+    pipelineVer.textContent = "No capsule available";
+    reasonsEl.innerHTML = "";
+    validatorsEl.innerHTML = "";
+    driftEl.innerHTML = "";
+    abstentionsEl.innerHTML = "";
+    extraEl.style.display = "none";
+    return;
+  }
+
+  // Badge pill
+  const badge = capsule.badge || "none";
+  pill.textContent = badge;
+  pill.className = `badge-pill badge-${sanitizeCssClass(badge)}`;
+
+  // Capsule ID and pipeline version
+  capsuleId.textContent = capsule.capsule_id || "";
+  pipelineVer.textContent = capsule.pipeline_version
+    ? `git:${capsule.pipeline_version} | ${capsule.machine_id || ""}`
+    : "";
+
+  // Badge reasons (use textContent to prevent XSS from external data)
+  const reasons = capsule.badge_reasons || [];
+  reasonsEl.innerHTML = "";
+  reasons.forEach((r) => {
+    const div = document.createElement("div");
+    div.textContent = r;
+    reasonsEl.appendChild(div);
+  });
+
+  // Validators (use textContent to prevent XSS)
+  extraEl.style.display = "";
+  const validations = capsule.validations || [];
+  validatorsEl.innerHTML = "";
+  validations.forEach((v) => {
+    const div = document.createElement("div");
+    div.className = v.passed ? "validator-pass" : "validator-fail";
+    // severity and rule_id come from capsule JSON — render via textContent (safe)
+    const icon = v.passed ? "PASS" : "FAIL";
+    div.textContent = `[${v.severity}] ${v.rule_id}: ${icon} — ${v.message}`;
+    validatorsEl.appendChild(div);
+  });
+
+  // Drift events (use textContent to prevent XSS)
+  const drifts = capsule.drift_events || [];
+  driftEl.innerHTML = "";
+  if (drifts.length === 0) {
+    const div = document.createElement("div");
+    div.textContent = "No drift events.";
+    driftEl.appendChild(div);
+  } else {
+    drifts.forEach((d) => {
+      const div = document.createElement("div");
+      div.className = `drift-${sanitizeCssClass(d.severity || "minor")}`;
+      const detail = d.pct_change != null
+        ? `${d.old} \u2192 ${d.new} (${d.pct_change}%)`
+        : d.ppt_shift != null
+          ? `${d.old}% \u2192 ${d.new}% (${d.ppt_shift} ppt)`
+          : `${d.old} \u2192 ${d.new}`;
+      div.textContent = `[${d.severity}] ${d.metric}: ${detail}`;
+      driftEl.appendChild(div);
+    });
+  }
+
+  // Abstentions (use textContent to prevent XSS)
+  const abstentions = capsule.abstentions || [];
+  abstentionsEl.innerHTML = "";
+  if (abstentions.length > 0) {
+    const header = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = "Abstentions:";
+    header.appendChild(strong);
+    abstentionsEl.appendChild(header);
+    abstentions.forEach((a) => {
+      const div = document.createElement("div");
+      div.textContent = `"${a.keyword}" (${a.mention_count} mentions) \u2014 ${a.reason}`;
+      abstentionsEl.appendChild(div);
+    });
+  }
+};
+
 const datasetCache = {};
 let currentDataset = "broad";
 let datasetRows = [];
@@ -290,6 +402,7 @@ let datasetDetail = {};
 let selectedNctId = null;
 let currentFilteredRows = [];
 let focusCondition = "";
+let enrichmentData = null;
 
 const updateDownloadLinks = (datasetKey) => {
   const config = datasetConfig[datasetKey];
@@ -457,7 +570,7 @@ const renderDetail = (nctId) => {
   statusEl.textContent = detail.overall_status || "Unknown";
   phaseEl.textContent = detail.phase || "Not reported";
   conditionsEl.textContent = detail.conditions || "Not reported";
-  const nctValid = /^NCT\d{8,}$/.test(detail.nct_id);
+  const nctValid = /^NCT\d{8}$/.test(detail.nct_id);
   linkEl.setAttribute("href", nctValid ? `https://clinicaltrials.gov/study/${detail.nct_id}` : "#");
 
   armsEl.innerHTML = "";
@@ -491,6 +604,9 @@ const renderDetail = (nctId) => {
       outcomesEl.appendChild(li);
     });
   }
+
+  // Render enrichment source badges
+  renderDetailSources(nctId);
 };
 
 const csvEscape = (value) => {
@@ -536,6 +652,166 @@ const downloadFilteredCsv = () => {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(blobUrl);
+};
+
+const loadEnrichment = async (path) => {
+  if (!path) return null;
+  try {
+    return await fetchJson(path);
+  } catch {
+    return null;
+  }
+};
+
+const renderSourceCoverage = (enrichment) => {
+  const section = document.getElementById("provenanceSection");
+  const container = document.getElementById("sourceCoverage");
+  if (!enrichment || enrichment.trial_count === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  const coverage = enrichment.source_coverage;
+  if (!coverage || typeof coverage !== "object") {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+  container.innerHTML = "";
+  const totalTrials = enrichment.trial_count || 1;
+  const sources = Object.entries(coverage).sort((a, b) => b[1] - a[1]);
+
+  sources.forEach(([source, count]) => {
+    const row = document.createElement("div");
+    row.className = "source-coverage-row";
+
+    const label = document.createElement("div");
+    const badge = document.createElement("span");
+    badge.className = `source-badge source-badge-${sanitizeCssClass(source)}`;
+    badge.textContent = source;
+    label.appendChild(badge);
+
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.width = `${(count / totalTrials) * 100}%`;
+    track.appendChild(fill);
+
+    const value = document.createElement("div");
+    value.className = "bar-value";
+    value.textContent = `${count}`;
+
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(value);
+    container.appendChild(row);
+  });
+};
+
+const renderDetailSources = (nctId) => {
+  const sourcesDiv = document.getElementById("detailSources");
+  const badgesDiv = document.getElementById("detailSourceBadges");
+  const linksDiv = document.getElementById("detailSourceLinks");
+
+  if (!enrichmentData || !enrichmentData.trials || !enrichmentData.trials[nctId]) {
+    sourcesDiv.style.display = "none";
+    return;
+  }
+
+  const trial = enrichmentData.trials[nctId];
+  const sources = trial.enrichment_sources || [];
+  if (sources.length === 0) {
+    sourcesDiv.style.display = "none";
+    return;
+  }
+
+  sourcesDiv.style.display = "";
+  badgesDiv.innerHTML = "";
+  linksDiv.innerHTML = "";
+
+  // Render source badges
+  sources.forEach((source) => {
+    const badge = document.createElement("span");
+    badge.className = `source-badge source-badge-${sanitizeCssClass(source)}`;
+    badge.textContent = source;
+    badgesDiv.appendChild(badge);
+  });
+
+  // Render PubMed links (validate PMID is numeric to prevent XSS)
+  const pmids = trial.pmid_list || [];
+  if (pmids.length > 0) {
+    const pubmedLine = document.createElement("div");
+    pubmedLine.appendChild(document.createTextNode("PubMed: "));
+    pmids.slice(0, 5).forEach((pmid, idx) => {
+      if (idx > 0) pubmedLine.appendChild(document.createTextNode(", "));
+      if (/^\d+$/.test(pmid)) {
+        const a = document.createElement("a");
+        a.href = `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        a.textContent = pmid;
+        pubmedLine.appendChild(a);
+      } else {
+        pubmedLine.appendChild(document.createTextNode(pmid));
+      }
+    });
+    if (pmids.length > 5) {
+      pubmedLine.appendChild(document.createTextNode(` (+${pmids.length - 5} more)`));
+    }
+    linksDiv.appendChild(pubmedLine);
+  }
+
+  // OA badge
+  if (trial.is_oa) {
+    const oaLine = document.createElement("div");
+    const oaBadge = document.createElement("span");
+    oaBadge.className = "oa-badge oa-badge-open";
+    oaBadge.textContent = "OA";
+    oaLine.textContent = "Open Access ";
+    oaLine.appendChild(oaBadge);
+    if (trial.oa_status) {
+      oaLine.appendChild(document.createTextNode(` (${trial.oa_status})`));
+    }
+    linksDiv.appendChild(oaLine);
+  }
+
+  // Citations
+  if (trial.cited_by_total > 0) {
+    const citLine = document.createElement("div");
+    citLine.textContent = `Cited by: ${formatNumber(trial.cited_by_total)}`;
+    linksDiv.appendChild(citLine);
+  }
+
+  // MeSH terms
+  const mesh = trial.mesh_terms || [];
+  if (mesh.length > 0) {
+    const meshLine = document.createElement("div");
+    meshLine.textContent = `MeSH: ${mesh.slice(0, 5).join(", ")}${mesh.length > 5 ? " ..." : ""}`;
+    linksDiv.appendChild(meshLine);
+  }
+
+  // FAERS reactions
+  const faers = trial.faers_top_reactions || [];
+  if (faers.length > 0) {
+    const faersLine = document.createElement("div");
+    faersLine.textContent = `FAERS signals: ${faers
+      .slice(0, 3)
+      .map((f) => `${f.reaction} (${formatNumber(f.count)})`)
+      .join(", ")}`;
+    linksDiv.appendChild(faersLine);
+  }
+
+  // WHO ICTRP
+  const whoIds = trial.who_trial_id || [];
+  if (whoIds.length > 0) {
+    const whoLine = document.createElement("div");
+    whoLine.textContent = `WHO ICTRP: ${whoIds.join(", ")}`;
+    if (trial.who_countries) {
+      whoLine.textContent += ` — ${trial.who_countries}`;
+    }
+    linksDiv.appendChild(whoLine);
+  }
 };
 
 const updateFocusOptions = (conditions) => {
@@ -663,8 +939,13 @@ const loadDataset = async (datasetKey) => {
   const rows = parseCsv(csvText);
   let armsRows = [];
   if (config.arms) {
-    const armsText = await fetchCsv(config.arms);
-    armsRows = parseCsv(armsText);
+    try {
+      const armsText = await fetchCsv(config.arms);
+      armsRows = parseCsv(armsText);
+    } catch {
+      // Arms data is supplementary — degrade gracefully
+      armsRows = [];
+    }
   }
   const armsMap = buildArmsMap(armsRows);
   const detailIndex = buildDetailIndex(rows);
@@ -723,6 +1004,14 @@ const onDatasetChange = async (datasetKey) => {
     renderDetail(null);
     selectedNctId = null;
   }
+  // TruthCert badge
+  const config = datasetConfig[datasetKey];
+  const capsule = config ? await loadCapsule(config.capsule) : null;
+  renderBadge(capsule);
+
+  // Enrichment data
+  enrichmentData = config ? await loadEnrichment(config.enrichment) : null;
+  renderSourceCoverage(enrichmentData);
 };
 
 const init = async () => {

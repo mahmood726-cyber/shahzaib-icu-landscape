@@ -7,12 +7,16 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import re
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+
+from truthcert import build_capsule
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = ROOT / "output"
@@ -24,10 +28,11 @@ CANONICAL_RULES = [
     # to prevent substring shadowing (e.g., "vasopressor-free days" must not
     # match "vasopressor" from the Vasopressor/Inotrope rule).
     ("Vasopressor-free days", ["vasopressor-free days"]),
+    ("Vasopressor dose", ["vasopressor dose"]),
     ("Ventilation duration", ["ventilator-free days", "mechanical ventilation duration"]),
     ("Shock index", ["shock index"]),
     ("Capillary Refill", ["capillary refill", "capillary refill time"]),
-    ("MAP", ["mean arterial pressure", "map"]),
+    ("MAP", ["mean arterial pressure"]),
     ("Blood Pressure", ["blood pressure", "systolic", "diastolic"]),
     ("Heart Rate", ["heart rate", "hr"]),
     ("Cardiac Output/Index", ["cardiac output", "cardiac index"]),
@@ -38,7 +43,7 @@ CANONICAL_RULES = [
     ("CVP", ["central venous pressure", "cvp"]),
     ("PAP", ["pulmonary artery pressure", "pap"]),
     ("PCWP", ["pulmonary capillary wedge pressure", "pcwp"]),
-    ("SVR", ["systemic vascular resistance", "svr", "svri"]),
+    ("SVR", ["systemic vascular resistance", "systemic vascular resistance index", "svr", "svri"]),
     ("PVR", ["pulmonary vascular resistance", "pvr"]),
     (
         "Venous O2 Saturation",
@@ -49,7 +54,7 @@ CANONICAL_RULES = [
             "scvo2",
         ],
     ),
-    ("Lactate", ["lactate"]),
+    ("Lactate", ["lactate", "lactate clearance"]),
     ("Oxygen Delivery", ["oxygen delivery", "do2"]),
     ("Oxygen Consumption", ["oxygen consumption", "vo2"]),
     ("Ejection Fraction", ["ejection fraction", "ef"]),
@@ -91,7 +96,7 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
     ),
     (r"\bdyn(?:es)?\s*\*?\s*s\s*/\s*cm\^?5\b", "dyn*s/cm5"),
     (r"\bwatt(?:s)?\b", "W"),
-    (r"(?<!\w)(?:\d[\d.]*\s*)sec(?:onds)?(?!\w)", "s"),
+    (r"(?<!\w)(?:\d+(?:\.\d+)?\s*)sec(?:onds)?(?!\w)", "s"),
 ]
 
 
@@ -109,7 +114,7 @@ class KeywordStats:
 
 
 def read_csv(path: Path) -> List[Dict[str, str]]:
-    with path.open("r", encoding="utf-8", newline="") as handle:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         return [row for row in reader]
 
@@ -134,7 +139,9 @@ def token_in_text(token: str, text: str) -> bool:
     text = text.lower()
     if len(token) <= 3:
         return any(part == token for part in text.replace("/", " ").split())
-    return token in text
+    # Use word boundary for longer tokens to prevent substring matches
+    # (e.g., "perfusion" should not match "hypoperfusion")
+    return re.search(r"\b" + re.escape(token) + r"\b", text) is not None
 
 
 def normalize_keyword(keyword: str, text: str) -> str:
@@ -155,6 +162,28 @@ def normalize_keyword(keyword: str, text: str) -> str:
                 return canonical
     return keyword.strip() or "Unmapped"
 
+
+# Fallback units for canonical keywords where:
+#   - the unit is unambiguous (scores, days, ratios), OR
+#   - the keyword category genuinely has no single unit ("varies", "N/A")
+# These are applied only when extract_unit() finds no explicit unit in
+# the measure/matched_text, so explicit units always take precedence.
+KEYWORD_FALLBACK_UNITS: Dict[str, str] = {
+    "Severity score": "score",
+    "Vasopressor-free days": "days",
+    "Ventilation duration": "days",
+    "Hemodynamics (general)": "N/A",
+    "Vasopressor/Inotrope": "varies",
+    "Perfusion": "N/A",
+    "Shock index": "ratio",
+    "MAP": "mmHg",
+    "Blood Pressure": "mmHg",
+    "Heart Rate": "bpm",
+    "Ejection Fraction": "%",
+    "SVV": "%",
+    "PPV": "%",
+    "Capillary Refill": "s",
+}
 
 _PERCENT_CONTEXT_RE = re.compile(
     r"(?:percent(?:age)?|%)\s*(?:change|reduction|increase|decrease|improvement|of\s)",
@@ -207,6 +236,22 @@ def write_parquet(csv_path: Path, parquet_path: Path) -> Dict[str, str]:
         }
 
 
+def _load_enrichment(
+    enrich_db: Path,
+    nct_ids: Set[str],
+    config_path: Optional[Path] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Load enrichment data from SQLite using the orchestrator's query logic.
+
+    Uses batch method (single DB connection) instead of per-NCT connections.
+    """
+    from enrich_orchestrator import EnrichmentOrchestrator, load_config, DEFAULT_CONFIG_PATH
+    effective_config_path = config_path or DEFAULT_CONFIG_PATH
+    config = load_config(effective_config_path)
+    orch = EnrichmentOrchestrator(enrich_db, config)
+    return orch.get_enrichment_summaries(list(nct_ids))
+
+
 def build_living_map(
     studies_csv: Path,
     hemo_csv: Path,
@@ -214,7 +259,12 @@ def build_living_map(
     dashboard_dir: Optional[Path] = None,
     label: str = DEFAULT_LABEL,
     write_parquet_output: bool = True,
+    raw_jsonl: Optional[Path] = None,
+    enrich_db: Optional[Path] = None,
 ) -> Dict[str, object]:
+    # Validate label to prevent path traversal and cross-label contamination
+    if not re.match(r"^[a-zA-Z0-9_-]+$", label):
+        raise ValueError(f"Invalid label '{label}': must be alphanumeric/hyphen/underscore only")
     studies_rows = read_csv(studies_csv)
     hemo_rows = read_csv(hemo_csv)
 
@@ -223,6 +273,15 @@ def build_living_map(
         nct_id = row.get("nct_id", "").strip()
         if nct_id:
             studies_map[nct_id] = row
+
+    # Load enrichment data if available
+    enrichment_map: Dict[str, Dict[str, Any]] = {}
+    if enrich_db and enrich_db.exists():
+        try:
+            enrichment_map = _load_enrichment(enrich_db, set(studies_map.keys()))
+        except Exception as exc:
+            print(f"Warning: enrichment loading failed, continuing without: {exc}")
+            enrichment_map = {}
 
     suffix = "" if label == DEFAULT_LABEL else f"_{label}"
     detailed_path = output_dir / f"icu_hemodynamic_living_map{suffix}.csv"
@@ -258,6 +317,15 @@ def build_living_map(
         "matched_text",
         "query_name",
     ]
+
+    # Add enrichment columns when enrichment data is available
+    enrichment_fields = [
+        "pub_count", "pmid_list", "doi_list", "mesh_terms",
+        "cited_by_total", "is_oa", "oa_status", "who_trial_id",
+        "who_countries", "faers_top_reactions", "enrichment_sources",
+    ]
+    if enrichment_map:
+        detailed_fields.extend(enrichment_fields)
 
     keyword_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
     normalized_keyword_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
@@ -320,8 +388,33 @@ def build_living_map(
             unit_raw, unit_normalized = extract_unit(
                 f"{detailed_row['measure']} {detailed_row['matched_text']}"
             )
+            # Apply keyword-implied fallback when no explicit unit found
+            if not unit_normalized:
+                fallback = KEYWORD_FALLBACK_UNITS.get(detailed_row["normalized_keyword"], "")
+                if fallback:
+                    unit_normalized = fallback
             detailed_row["unit_raw"] = unit_raw
             detailed_row["normalized_unit"] = unit_normalized
+
+            # Merge enrichment columns if available
+            if enrichment_map:
+                enr = enrichment_map.get(nct_id, {})
+                detailed_row["pub_count"] = str(enr.get("pub_count", 0))
+                detailed_row["pmid_list"] = ";".join(enr.get("pmid_list", []))
+                detailed_row["doi_list"] = ";".join(enr.get("doi_list", []))
+                detailed_row["mesh_terms"] = "|".join(enr.get("mesh_terms", []))
+                detailed_row["cited_by_total"] = str(enr.get("cited_by_total", 0))
+                detailed_row["is_oa"] = str(enr.get("is_oa", False))
+                detailed_row["oa_status"] = enr.get("oa_status") or ""
+                detailed_row["who_trial_id"] = ";".join(enr.get("who_trial_id", []))
+                detailed_row["who_countries"] = enr.get("who_countries", "")
+                faers = enr.get("faers_top_reactions", [])
+                detailed_row["faers_top_reactions"] = "|".join(
+                    f"{f['drug'].replace('|', ' ').replace('\t', ' ')}\t{f['reaction'].replace('|', ' ').replace('\t', ' ')}\t{f.get('count', 0)}"
+                    for f in faers
+                )
+                detailed_row["enrichment_sources"] = ";".join(enr.get("enrichment_sources", []))
+
             writer.writerow(detailed_row)
 
             total_mentions += 1
@@ -388,57 +481,93 @@ def build_living_map(
             "placebo_hemo_mentions": placebo_mentions,
             "non_placebo_hemo_mentions": total_mentions - placebo_mentions,
         },
-        "keywords": [
-            {
-                "keyword": key,
-                "mention_count": stats.mention_count,
-                "study_count": len(stats.study_ids),
-                "placebo_study_count": len(stats.placebo_study_ids),
-            }
-            for key, stats in keyword_stats.items()
-        ],
-        "normalized_keywords": [
-            {
-                "keyword": key,
-                "mention_count": stats.mention_count,
-                "study_count": len(stats.study_ids),
-                "placebo_study_count": len(stats.placebo_study_ids),
-            }
-            for key, stats in normalized_keyword_stats.items()
-        ],
-        "units": [
-            {
-                "unit": key,
-                "mention_count": stats.mention_count,
-                "study_count": len(stats.study_ids),
-                "placebo_study_count": len(stats.placebo_study_ids),
-            }
-            for key, stats in unit_stats.items()
-        ],
-        "outcome_types": [
-            {
-                "outcome_type": key,
-                "mention_count": stats.mention_count,
-                "study_count": len(stats.study_ids),
-                "placebo_study_count": len(stats.placebo_study_ids),
-            }
-            for key, stats in outcome_stats.items()
-        ],
-        "conditions": [
-            {
-                "condition": key,
-                "mention_count": stats.mention_count,
-                "study_count": len(stats.study_ids),
-                "placebo_study_count": len(stats.placebo_study_ids),
-            }
-            for key, stats in condition_stats.items()
-        ],
+        "keywords": sorted(
+            [
+                {
+                    "keyword": key,
+                    "mention_count": stats.mention_count,
+                    "study_count": len(stats.study_ids),
+                    "placebo_study_count": len(stats.placebo_study_ids),
+                }
+                for key, stats in keyword_stats.items()
+            ],
+            key=lambda x: x["keyword"],
+        ),
+        "normalized_keywords": sorted(
+            [
+                {
+                    "keyword": key,
+                    "mention_count": stats.mention_count,
+                    "study_count": len(stats.study_ids),
+                    "placebo_study_count": len(stats.placebo_study_ids),
+                }
+                for key, stats in normalized_keyword_stats.items()
+            ],
+            key=lambda x: x["keyword"],
+        ),
+        "units": sorted(
+            [
+                {
+                    "unit": key,
+                    "mention_count": stats.mention_count,
+                    "study_count": len(stats.study_ids),
+                    "placebo_study_count": len(stats.placebo_study_ids),
+                }
+                for key, stats in unit_stats.items()
+            ],
+            key=lambda x: x["unit"],
+        ),
+        "outcome_types": sorted(
+            [
+                {
+                    "outcome_type": key,
+                    "mention_count": stats.mention_count,
+                    "study_count": len(stats.study_ids),
+                    "placebo_study_count": len(stats.placebo_study_ids),
+                }
+                for key, stats in outcome_stats.items()
+            ],
+            key=lambda x: x["outcome_type"],
+        ),
+        "conditions": sorted(
+            [
+                {
+                    "condition": key,
+                    "mention_count": stats.mention_count,
+                    "study_count": len(stats.study_ids),
+                    "placebo_study_count": len(stats.placebo_study_ids),
+                }
+                for key, stats in condition_stats.items()
+            ],
+            key=lambda x: x["condition"],
+        ),
     }
+
+    # Add enrichment summary section
+    if enrichment_map:
+        source_counts: Dict[str, int] = defaultdict(int)
+        enriched_nct_ids = 0
+        for nct_id, enr in enrichment_map.items():
+            if enr.get("enrichment_sources"):
+                enriched_nct_ids += 1
+            for src in enr.get("enrichment_sources", []):
+                source_counts[src] += 1
+        summary["enrichment"] = {
+            "enabled": True,
+            "enriched_trials": enriched_nct_ids,
+            "source_coverage": dict(sorted(source_counts.items())),
+        }
+    else:
+        summary["enrichment"] = {"enabled": False}
 
     parquet_info: Dict[str, str] = {"status": "skipped", "reason": "disabled"}
     if write_parquet_output:
         parquet_path = output_dir / f"icu_hemodynamic_living_map{suffix}.parquet"
-        parquet_info = write_parquet(detailed_path, parquet_path)
+        try:
+            parquet_info = write_parquet(detailed_path, parquet_path)
+        except Exception as exc:
+            parquet_info = {"status": "error", "reason": str(exc)}
+            print(f"Warning: parquet export failed, continuing: {exc}", file=sys.stderr)
 
     summary["parquet"] = parquet_info
 
@@ -449,14 +578,49 @@ def build_living_map(
 
     if dashboard_dir:
         dashboard_dir.mkdir(parents=True, exist_ok=True)
-        for name, content in [
-            (f"icu_hemodynamic_summary{suffix}.json", json.dumps(summary, indent=2)),
-            (f"icu_hemodynamic_living_map{suffix}.csv", detailed_path.read_text(encoding="utf-8")),
-        ]:
-            tmp = dashboard_dir / f"{name}.tmp"
-            final = dashboard_dir / name
-            tmp.write_text(content, encoding="utf-8")
-            tmp.replace(final)
+        # Copy summary JSON atomically
+        summary_name = f"icu_hemodynamic_summary{suffix}.json"
+        tmp = dashboard_dir / f"{summary_name}.tmp"
+        final = dashboard_dir / summary_name
+        tmp.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        tmp.replace(final)
+        # Copy CSV via shutil instead of reading back into memory
+        csv_name = f"icu_hemodynamic_living_map{suffix}.csv"
+        csv_tmp = dashboard_dir / f"{csv_name}.tmp"
+        csv_final = dashboard_dir / csv_name
+        shutil.copy2(str(detailed_path), str(csv_tmp))
+        csv_tmp.replace(csv_final)
+
+        # Export enrichment summary for dashboard
+        if enrichment_map and enrich_db and enrich_db.exists():
+            try:
+                enr_output = {
+                    "generated_utc": datetime.now(timezone.utc).isoformat(),
+                    "trial_count": len(studies_map),
+                    "source_coverage": dict(summary.get("enrichment", {}).get("source_coverage", {})),
+                    "trials": enrichment_map,
+                }
+                enr_path = dashboard_dir / f"enrichment_summary{suffix}.json"
+                enr_tmp = enr_path.with_suffix(".json.tmp")
+                enr_tmp.write_text(json.dumps(enr_output, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+                enr_tmp.replace(enr_path)
+            except Exception as exc:
+                print(f"Warning: enrichment dashboard export failed: {exc}")
+
+    # TruthCert: build provenance capsule
+    build_capsule(
+        label=label,
+        studies_csv=studies_csv,
+        hemo_csv=hemo_csv,
+        output_csv=detailed_path,
+        summary=summary,
+        canonical_rules=CANONICAL_RULES,
+        unit_patterns=UNIT_PATTERNS,
+        output_dir=output_dir,
+        dashboard_dir=dashboard_dir,
+        raw_jsonl=raw_jsonl,
+        enrich_db=enrich_db,
+    )
 
     return summary
 
@@ -494,7 +658,31 @@ def main() -> int:
         default=False,
         help="Skip writing a parquet version of the living map",
     )
+    parser.add_argument(
+        "--raw-jsonl",
+        default=None,
+        help="Path to raw JSONL from CT.gov fetch (for TruthCert provenance hashing)",
+    )
+    parser.add_argument(
+        "--enrich",
+        action="store_true",
+        default=False,
+        help="Merge enrichment data from SQLite into output CSV",
+    )
+    parser.add_argument(
+        "--enrich-db",
+        default=None,
+        help="Path to enrichment SQLite database (default: enrichment/enrichment_db.sqlite)",
+    )
     args = parser.parse_args()
+
+    enrich_db = None
+    if args.enrich or args.enrich_db:
+        # --enrich-db implies --enrich (don't silently ignore the DB path)
+        if args.enrich_db:
+            enrich_db = Path(args.enrich_db)
+        else:
+            enrich_db = ROOT / "enrichment" / "enrichment_db.sqlite"
 
     summary = build_living_map(
         Path(args.studies),
@@ -503,6 +691,8 @@ def main() -> int:
         Path(args.dashboard_dir),
         label=args.label,
         write_parquet_output=not args.no_write_parquet,
+        raw_jsonl=Path(args.raw_jsonl) if args.raw_jsonl else None,
+        enrich_db=enrich_db,
     )
 
     print("Living map created.")

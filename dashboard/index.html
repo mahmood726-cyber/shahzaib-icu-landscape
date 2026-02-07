@@ -41,6 +41,21 @@
           </div>
           <p class="meta-note">Switch updates stats and explorer data.</p>
         </div>
+        <div class="meta-card" id="badgeCard">
+          <p class="meta-label">Assurance</p>
+          <div id="badgeContainer">
+            <span class="badge-pill badge-none" id="badgePill">--</span>
+          </div>
+          <p class="badge-id" id="badgeCapsuleId"></p>
+          <p class="badge-detail" id="badgePipelineVersion"></p>
+          <div class="badge-reasons" id="badgeReasons"></div>
+          <details class="badge-details-toggle" id="badgeExtra">
+            <summary>Validators &amp; drift</summary>
+            <div class="badge-validators" id="badgeValidators"></div>
+            <div class="badge-drift" id="badgeDrift"></div>
+            <div class="badge-abstentions" id="badgeAbstentions"></div>
+          </details>
+        </div>
       </div>
     </header>
 
@@ -233,7 +248,22 @@
               <ul id="detailOutcomes" class="detail-list"></ul>
             </div>
           </div>
+          <div class="source-detail" id="detailSources" style="display:none">
+            <p class="detail-label">Enrichment sources</p>
+            <div class="source-badges" id="detailSourceBadges"></div>
+            <div class="source-links" id="detailSourceLinks"></div>
+          </div>
         </div>
+      </div>
+    </section>
+
+    <section class="section reveal" id="provenanceSection" style="display:none">
+      <div class="section-header">
+        <h2>Data provenance</h2>
+        <p>External enrichment sources contributing evidence to each trial.</p>
+      </div>
+      <div class="panel wide">
+        <div class="source-coverage" id="sourceCoverage"></div>
       </div>
     </section>
 

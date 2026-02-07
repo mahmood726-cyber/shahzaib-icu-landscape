@@ -150,6 +150,69 @@ body {
   color: var(--muted);
 }
 
+/* ── TruthCert Badge ──────────────────────────────────────────────── */
+
+.badge-pill {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fff;
+}
+
+.badge-gold { background: linear-gradient(135deg, #c9a227, #e8d174); color: #3a2e00; }
+.badge-silver { background: linear-gradient(135deg, #8e9eab, #c0c8d0); color: #1a2a36; }
+.badge-bronze { background: linear-gradient(135deg, #b87333, #d4956a); }
+.badge-none { background: #bbb; }
+
+.badge-id {
+  margin: 8px 0 2px;
+  font-size: 0.75rem;
+  font-family: "Courier New", Courier, monospace;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.badge-detail {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.badge-reasons {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.badge-details-toggle {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.badge-details-toggle summary {
+  cursor: pointer;
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.badge-validators, .badge-drift, .badge-abstentions {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.validator-pass { color: #2a7a3a; }
+.validator-fail { color: #b83230; }
+.drift-minor { color: var(--muted); }
+.drift-moderate { color: #b87333; }
+.drift-major { color: #b83230; }
+
 .cards {
   margin-top: 36px;
   display: grid;
@@ -445,6 +508,88 @@ body {
   margin-top: 10px;
   color: var(--muted);
 }
+
+/* ── Enrichment source badges ────────────────────────────────────── */
+
+.source-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+  margin: 3px 4px 3px 0;
+}
+
+.source-badge-pubmed { background: #326599; }
+.source-badge-europmc { background: #2d8659; }
+.source-badge-openalex { background: #c94444; }
+.source-badge-crossref { background: #e67e22; }
+.source-badge-opencitations { background: #8e44ad; }
+.source-badge-unpaywall { background: #27ae60; }
+.source-badge-who_ictrp { background: #009edb; }
+.source-badge-openfda { background: #7f8c8d; }
+
+.source-coverage {
+  display: grid;
+  gap: 10px;
+}
+
+.source-coverage-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.source-coverage-row .bar-track {
+  height: 8px;
+}
+
+.source-detail {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(27, 26, 25, 0.1);
+}
+
+.source-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.source-links {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.source-links a {
+  color: var(--accent-2);
+  text-decoration: none;
+}
+
+.source-links a:hover {
+  text-decoration: underline;
+}
+
+.oa-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #f39c12;
+  color: #fff;
+  margin-left: 6px;
+}
+
+.oa-badge-open { background: #27ae60; }
+.oa-badge-closed { background: #95a5a6; }
 
 .note {
   margin: 0;

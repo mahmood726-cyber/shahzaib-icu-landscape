@@ -18,6 +18,8 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "ctgov_icu_placebo_strategy.json"
+
+_NCT_RE = re.compile(r"^NCT\d{8}$")
 TOOLING_ROOT = Path(
     os.environ.get("CTGOV_TOOLING_ROOT", ROOT.parent / "ctgov-search-strategies")
 )
@@ -102,7 +104,9 @@ def keyword_in_text(keyword: str, text: str) -> bool:
     t = text.lower()
     if len(k) <= 3:
         return re.search(rf"\b{re.escape(k)}\b", t) is not None
-    return k in t
+    # Use word boundary to prevent substring matches (e.g., "perfusion"
+    # should not match "hypoperfusion") — consistent with build_living_map.py
+    return re.search(r"\b" + re.escape(k) + r"\b", t) is not None
 
 
 def find_hemodynamic_keywords(keywords: List[str], text: str) -> List[str]:
@@ -227,15 +231,26 @@ def extract_study_fields(study: Dict) -> Dict[str, str]:
     }
 
 
+def _csv_safe(value: str) -> str:
+    """Guard against CSV formula injection in Excel/Sheets."""
+    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def open_csv(path: Path, header: List[str]) -> csv.DictWriter:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(".csv.tmp")
     handle = tmp_path.open("w", encoding="utf-8", newline="")
-    writer = csv.DictWriter(handle, fieldnames=header)
-    writer.writeheader()
-    writer._handle = handle  # type: ignore[attr-defined]
-    writer._tmp_path = tmp_path  # type: ignore[attr-defined]
-    writer._final_path = path  # type: ignore[attr-defined]
+    try:
+        writer = csv.DictWriter(handle, fieldnames=header)
+        writer.writeheader()
+        writer._handle = handle  # type: ignore[attr-defined]
+        writer._tmp_path = tmp_path  # type: ignore[attr-defined]
+        writer._final_path = path  # type: ignore[attr-defined]
+    except Exception:
+        handle.close()
+        raise
     return writer
 
 
@@ -376,6 +391,13 @@ def run_query(
                     total += 1
 
                     fields = extract_study_fields(study)
+                    # Validate NCT ID format (V-2)
+                    nct_id = fields.get("nct_id", "")
+                    if not _NCT_RE.match(nct_id):
+                        continue
+                    # Sanitize text fields against CSV formula injection (V-14)
+                    for key in ("brief_title", "official_title", "conditions", "keywords"):
+                        fields[key] = _csv_safe(fields.get(key, ""))
                     arms = extract_arms(study)
                     outcomes = extract_outcomes(study)
 
@@ -564,7 +586,9 @@ def main() -> int:
         except (json.JSONDecodeError, OSError):
             existing = {}
     existing.update(summary)
-    summary_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    summary_tmp = summary_path.with_suffix(".json.tmp")
+    summary_tmp.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+    summary_tmp.replace(summary_path)
     return 0
 
 

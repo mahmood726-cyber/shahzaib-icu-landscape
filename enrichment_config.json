@@ -1,0 +1,55 @@
+{
+  "sources": {
+    "pubmed": {
+      "enabled": true,
+      "rate_limit": 3.0,
+      "retries": 3,
+      "base_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    },
+    "europmc": {
+      "enabled": true,
+      "rate_limit": 5.0,
+      "retries": 3,
+      "base_url": "https://www.ebi.ac.uk/europepmc/webservices/rest"
+    },
+    "openalex": {
+      "enabled": true,
+      "rate_limit": 10.0,
+      "retries": 3,
+      "base_url": "https://api.openalex.org"
+    },
+    "crossref": {
+      "enabled": true,
+      "rate_limit": 5.0,
+      "retries": 3,
+      "base_url": "https://api.crossref.org"
+    },
+    "opencitations": {
+      "enabled": true,
+      "rate_limit": 5.0,
+      "retries": 3,
+      "base_url": "https://opencitations.net/index/coci/api/v1"
+    },
+    "unpaywall": {
+      "enabled": true,
+      "rate_limit": 10.0,
+      "retries": 3,
+      "base_url": "https://api.unpaywall.org/v2",
+      "email": ""
+    },
+    "who_ictrp": {
+      "enabled": true,
+      "rate_limit": 0,
+      "retries": 1,
+      "base_url": ""
+    },
+    "openfda": {
+      "enabled": true,
+      "rate_limit": 4.0,
+      "retries": 3,
+      "base_url": "https://api.fda.gov/drug/event.json"
+    }
+  },
+  "max_age_days": 30,
+  "email": ""
+}

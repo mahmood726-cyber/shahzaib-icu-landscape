@@ -3,3 +3,5 @@ logs/
 output/
 raw/
 *.pyc
+enrichment/*.sqlite
+enrichment/*.csv
