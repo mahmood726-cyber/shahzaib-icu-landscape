@@ -137,15 +137,15 @@ def detect_drift(
         })
 
     # Placebo ratio shift
-    old_total = prev_totals.get("total_hemo_mentions", 0)
-    new_total = current_totals.get("total_hemo_mentions", 0)
+    old_hemo_total = prev_totals.get("total_hemo_mentions", 0)
+    new_hemo_total = current_totals.get("total_hemo_mentions", 0)
     old_placebo_ratio = (
-        prev_totals.get("placebo_hemo_mentions", 0) / old_total * 100.0
-        if old_total > 0 else 0.0
+        prev_totals.get("placebo_hemo_mentions", 0) / old_hemo_total * 100.0
+        if old_hemo_total > 0 else 0.0
     )
     new_placebo_ratio = (
-        current_totals.get("placebo_hemo_mentions", 0) / new_total * 100.0
-        if new_total > 0 else 0.0
+        current_totals.get("placebo_hemo_mentions", 0) / new_hemo_total * 100.0
+        if new_hemo_total > 0 else 0.0
     )
     ratio_shift = abs(new_placebo_ratio - old_placebo_ratio)
     if ratio_shift > 2.0:
@@ -389,7 +389,11 @@ def build_capsule(
     if raw_jsonl is not None and raw_jsonl.exists():
         input_hashes[raw_jsonl.name] = compute_file_hash(raw_jsonl)
     if enrich_db is not None and enrich_db.exists():
-        input_hashes["enrichment_db.sqlite"] = compute_file_hash(enrich_db)
+        try:
+            input_hashes["enrichment_db.sqlite"] = compute_file_hash(enrich_db)
+        except (OSError, PermissionError) as exc:
+            import sys
+            print(f"  [truthcert] Cannot hash enrichment DB (locked?): {exc}", file=sys.stderr)
 
     output_hashes: Dict[str, str] = {}
     if output_csv.exists():

@@ -100,6 +100,13 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
 ]
 
 
+def _csv_safe(value: str) -> str:
+    """Guard against CSV formula injection in Excel/Sheets."""
+    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 @dataclass
 class KeywordStats:
     mention_count: int = 0
@@ -354,12 +361,12 @@ def build_living_map(
 
             detailed_row = {
                 "nct_id": nct_id,
-                "brief_title": study.get("brief_title", "").strip(),
+                "brief_title": _csv_safe(study.get("brief_title", "").strip()),
                 "overall_status": study.get("overall_status", "").strip(),
                 "allocation": study.get("allocation", "").strip(),
                 "intervention_model": study.get("intervention_model", "").strip(),
                 "masking": study.get("masking", "").strip(),
-                "masking_description": study.get("masking_description", "").strip(),
+                "masking_description": _csv_safe(study.get("masking_description", "").strip()),
                 "masking_subjects": study.get("masking_subjects", "").strip(),
                 "phase": study.get("phase", "").strip(),
                 "start_date": study.get("start_date", "").strip(),
@@ -368,18 +375,18 @@ def build_living_map(
                 "results_first_posted": study.get("results_first_posted", "").strip(),
                 "enrollment_count": study.get("enrollment_count", "").strip(),
                 "enrollment_type": study.get("enrollment_type", "").strip(),
-                "conditions": study.get("conditions", "").strip(),
-                "study_keywords": study.get("keywords", "").strip(),
+                "conditions": _csv_safe(study.get("conditions", "").strip()),
+                "study_keywords": _csv_safe(study.get("keywords", "").strip()),
                 "arm_count": study.get("arm_count", "").strip(),
                 "placebo_arm_count": str(placebo_arm_count),
                 "has_placebo_arm": str(has_placebo),
                 "outcome_type": row.get("outcome_type", "").strip(),
-                "measure": row.get("measure", "").strip(),
+                "measure": _csv_safe(row.get("measure", "").strip()),
                 "keyword": row.get("keyword", "").strip(),
                 "normalized_keyword": "",
                 "unit_raw": "",
                 "normalized_unit": "",
-                "matched_text": row.get("matched_text", "").strip(),
+                "matched_text": _csv_safe(row.get("matched_text", "").strip()),
                 "query_name": row.get("query_name", "").strip(),
             }
             detailed_row["normalized_keyword"] = normalize_keyword(

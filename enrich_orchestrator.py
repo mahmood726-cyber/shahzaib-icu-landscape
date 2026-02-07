@@ -41,6 +41,7 @@ def init_db(db_path: Path) -> None:
     try:
         # WAL pragma must be set outside executescript (B-6)
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         conn.executescript(schema)
         conn.commit()
     finally:
@@ -91,6 +92,7 @@ def load_trials(studies_csv: Path, db_path: Path, limit: Optional[int] = None) -
     now = datetime.now(timezone.utc).isoformat()
     conn = sqlite3.connect(str(db_path))
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout = 30000")
     try:
         for row in trials:
             nct_id = row.get("nct_id", "").strip()
@@ -144,10 +146,10 @@ class EnrichmentOrchestrator:
         """Run enrichment pipeline."""
         from sources import SOURCE_PHASES
 
-        # Use override without mutating the shared config dict (B-3/P-2)
-        effective_config = self.config
+        # Always copy to avoid mutating the shared config dict (B-3/P-2)
+        effective_config = {**self.config}
         if max_age_days is not None:
-            effective_config = {**self.config, "max_age_days": max_age_days}
+            effective_config["max_age_days"] = max_age_days
 
         # Determine which sources to run
         all_source_names = list(SOURCE_PHASES.keys())
@@ -243,6 +245,7 @@ class EnrichmentOrchestrator:
         """Get enrichment summary for a single trial (for dashboard)."""
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         conn.row_factory = sqlite3.Row
         try:
             return self._enrichment_for_nct(conn, nct_id)
@@ -253,6 +256,7 @@ class EnrichmentOrchestrator:
         """Batch enrichment summaries — single DB connection for all NCT IDs."""
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         conn.row_factory = sqlite3.Row
         try:
             return {nct_id: self._enrichment_for_nct(conn, nct_id) for nct_id in nct_ids}
@@ -372,6 +376,7 @@ class EnrichmentOrchestrator:
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         try:
             cursor = conn.execute(
                 """INSERT INTO enrichment_runs
@@ -388,6 +393,7 @@ class EnrichmentOrchestrator:
         now = datetime.now(timezone.utc).isoformat()
         conn = sqlite3.connect(str(self.db_path))
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         try:
             conn.execute(
                 "UPDATE enrichment_runs SET finished_utc = ?, status = 'done' WHERE run_id = ?",
@@ -464,6 +470,7 @@ def main() -> int:
     if args.export_dashboard:
         # Load all NCT IDs from DB
         conn = sqlite3.connect(str(db_path))
+        conn.execute("PRAGMA busy_timeout = 30000")
         try:
             rows = conn.execute("SELECT nct_id FROM trials").fetchall()
             nct_ids = [r[0] for r in rows]

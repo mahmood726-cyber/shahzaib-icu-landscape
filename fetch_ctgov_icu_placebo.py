@@ -429,9 +429,9 @@ def run_query(
                         arms_writer.writerow(
                             {
                                 "nct_id": fields["nct_id"],
-                                "arm_label": arm.label,
-                                "arm_description": arm.description,
-                                "intervention_names": arm.intervention_names,
+                                "arm_label": _csv_safe(arm.label),
+                                "arm_description": _csv_safe(arm.description),
+                                "intervention_names": _csv_safe(arm.intervention_names),
                                 "is_placebo_arm": str(arm.is_placebo),
                                 "comparator_type": arm.comparator_type,
                                 "arm_role": arm.arm_role,
@@ -447,9 +447,9 @@ def run_query(
                             {
                                 "nct_id": fields["nct_id"],
                                 "outcome_type": outcome.outcome_type,
-                                "measure": outcome.measure,
-                                "time_frame": outcome.time_frame,
-                                "description": outcome.description,
+                                "measure": _csv_safe(outcome.measure),
+                                "time_frame": _csv_safe(outcome.time_frame),
+                                "description": _csv_safe(outcome.description),
                                 "query_name": query_name,
                             }
                         )
@@ -460,9 +460,9 @@ def run_query(
                             {
                                 "nct_id": fields["nct_id"],
                                 "outcome_type": outcome.outcome_type,
-                                "measure": outcome.measure,
+                                "measure": _csv_safe(outcome.measure),
                                 "keyword": kw,
-                                "matched_text": text,
+                                "matched_text": _csv_safe(text),
                                 "query_name": query_name,
                             }
                         )

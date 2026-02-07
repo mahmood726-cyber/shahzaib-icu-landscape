@@ -303,16 +303,20 @@ def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult
                                 "No enrichment DB — skipped")
     import sqlite3
     from datetime import datetime, timezone
+    conn = None
     try:
         conn = sqlite3.connect(str(enrich_db))
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         row = conn.execute(
             "SELECT MIN(fetched_utc) FROM enrichment_log WHERE status = 'ok'"
         ).fetchone()
-        conn.close()
     except sqlite3.DatabaseError as exc:
         return ValidationResult("P1-enrichment-staleness", "P1", False,
                                 f"Enrichment DB error: {exc}")
+    finally:
+        if conn is not None:
+            conn.close()
 
     if row is None or row[0] is None:
         return ValidationResult("P1-enrichment-staleness", "P1", True,
@@ -365,14 +369,18 @@ def validate_enrichment_hashes(enrich_db: Optional[Path]) -> ValidationResult:
         return ValidationResult("P2-enrichment-hashes", "P2", True,
                                 "No enrichment DB — skipped")
     import sqlite3
+    conn = None
     try:
         conn = sqlite3.connect(str(enrich_db))
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
         row = conn.execute("SELECT COUNT(*) FROM source_hashes").fetchone()
-        conn.close()
     except sqlite3.DatabaseError as exc:
         return ValidationResult("P2-enrichment-hashes", "P2", False,
                                 f"Enrichment DB error: {exc}")
+    finally:
+        if conn is not None:
+            conn.close()
     count = row[0] if row else 0
     passed = count > 0
     return ValidationResult(
