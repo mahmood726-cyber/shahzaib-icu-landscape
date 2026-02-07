@@ -102,10 +102,14 @@ class PubMedAdapter(BaseAdapter):
 
     def _efetch(self, pmids: List[str]) -> List[Dict[str, Any]]:
         """Fetch article metadata for a list of PMIDs (batch up to 200)."""
+        # Validate PMIDs are purely numeric to prevent URL parameter injection
+        safe_pmids = [p for p in pmids if p and re.match(r"^\d{1,12}$", p)]
+        if not safe_pmids:
+            return []
         articles: List[Dict[str, Any]] = []
         # Batch in groups of 200
-        for i in range(0, len(pmids), 200):
-            batch = pmids[i : i + 200]
+        for i in range(0, len(safe_pmids), 200):
+            batch = safe_pmids[i : i + 200]
             ids_str = ",".join(batch)
             url = (
                 f"{self.config.base_url}/efetch.fcgi"
@@ -118,10 +122,13 @@ class PubMedAdapter(BaseAdapter):
     def _parse_pubmed_xml(self, xml_bytes: bytes) -> List[Dict[str, Any]]:
         """Parse PubMed XML efetch response into article dicts."""
         articles: List[Dict[str, Any]] = []
-        # Reject XML with DTD declarations to prevent entity expansion
-        # attacks (billion-laughs). PubMed's legitimate responses do not
-        # contain DTD or ENTITY declarations.
-        if b"<!DOCTYPE" in xml_bytes or b"<!ENTITY" in xml_bytes:
+        # Reject XML with inline ENTITY declarations to prevent entity
+        # expansion attacks (billion-laughs). Note: PubMed responses
+        # legitimately include <!DOCTYPE> so we only block <!ENTITY>.
+        if b"<!ENTITY" in xml_bytes:
+            return articles
+        # Cap input size to prevent memory exhaustion from very large responses
+        if len(xml_bytes) > 50 * 1024 * 1024:  # 50 MB
             return articles
         try:
             root = ET.fromstring(xml_bytes)
@@ -209,8 +216,15 @@ def _text_content(element) -> str:
     return "".join(element.itertext()).strip()
 
 
+_MONTH_MAP = {
+    "jan": "01", "feb": "02", "mar": "03", "apr": "04",
+    "may": "05", "jun": "06", "jul": "07", "aug": "08",
+    "sep": "09", "oct": "10", "nov": "11", "dec": "12",
+}
+
+
 def _parse_pub_date(element) -> str:
-    """Parse a PubDate element into a string."""
+    """Parse a PubDate element into a consistent YYYY-MM-DD string."""
     if element is None:
         return ""
     year = element.findtext("Year", "")
@@ -220,7 +234,10 @@ def _parse_pub_date(element) -> str:
     if year:
         parts = [year]
         if month:
-            parts.append(month.zfill(2) if month.isdigit() else month)
+            if month.isdigit():
+                parts.append(month.zfill(2))
+            else:
+                parts.append(_MONTH_MAP.get(month.lower()[:3], month))
         if day:
             parts.append(day.zfill(2))
         return "-".join(parts)

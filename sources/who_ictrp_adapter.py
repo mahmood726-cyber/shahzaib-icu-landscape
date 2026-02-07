@@ -157,4 +157,4 @@ def _extract_nct_ids(trial_id: str, secondary_ids: str) -> List[str]:
     """Extract NCT IDs from trial ID and secondary IDs fields."""
     combined = f"{trial_id};{secondary_ids}"
     matches = _NCT_RE.findall(combined)
-    return [m.upper() for m in set(matches)]
+    return sorted(set(m.upper() for m in matches))

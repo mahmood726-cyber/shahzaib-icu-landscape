@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -76,15 +77,17 @@ def get_git_sha(repo_dir: Path) -> str:
 
 
 def get_machine_id() -> str:
-    return socket.gethostname()
+    """Return a hashed machine identifier to avoid leaking hostname."""
+    raw = socket.gethostname()
+    return f"host:{hashlib.sha256(raw.encode()).hexdigest()[:12]}"
 
 
 # ── Drift Detection ──────────────────────────────────────────────────
 
-def _pct_change(old: int, new: int) -> float:
-    """Percentage change, or 0.0 if old is zero."""
+def _pct_change(old: int, new: int) -> Optional[float]:
+    """Percentage change. Returns None for 0→N (bootstrap, not drift)."""
     if old == 0:
-        return 100.0 if new > 0 else 0.0
+        return None if new > 0 else 0.0
     return abs(new - old) / old * 100.0
 
 
@@ -115,26 +118,28 @@ def detect_drift(
     new_trials = current_totals.get("total_studies", 0)
     if old_trials != new_trials:
         pct = _pct_change(old_trials, new_trials)
-        events.append({
-            "metric": "total_studies",
-            "old": old_trials,
-            "new": new_trials,
-            "pct_change": round(pct, 1),
-            "severity": _drift_severity(pct),
-        })
+        if pct is not None:  # None = bootstrap (0→N), not drift
+            events.append({
+                "metric": "total_studies",
+                "old": old_trials,
+                "new": new_trials,
+                "pct_change": round(pct, 1),
+                "severity": _drift_severity(pct),
+            })
 
     # Hemo mention count change
     old_hemo = prev_totals.get("total_hemo_mentions", 0)
     new_hemo = current_totals.get("total_hemo_mentions", 0)
     if old_hemo != new_hemo:
         pct = _pct_change(old_hemo, new_hemo)
-        events.append({
-            "metric": "total_hemo_mentions",
-            "old": old_hemo,
-            "new": new_hemo,
-            "pct_change": round(pct, 1),
-            "severity": _drift_severity(pct),
-        })
+        if pct is not None:
+            events.append({
+                "metric": "total_hemo_mentions",
+                "old": old_hemo,
+                "new": new_hemo,
+                "pct_change": round(pct, 1),
+                "severity": _drift_severity(pct),
+            })
 
     # Placebo ratio shift
     old_hemo_total = prev_totals.get("total_hemo_mentions", 0)
@@ -284,6 +289,7 @@ def collect_abstentions(
 # ── Previous capsule loading ──────────────────────────────────────────
 
 _CAPSULE_REQUIRED_KEYS = {"capsule_id", "generated_utc", "badge"}
+_CAPSULE_FN_RE = re.compile(r"^capsule_[a-zA-Z0-9_-]+_\d{8}T\d{6}\d*Z\.json$")
 
 
 def _load_prev_capsules(
@@ -292,13 +298,16 @@ def _load_prev_capsules(
     """Load previous capsule JSONs from capsule_dir, sorted by generated_utc.
 
     Only the most recent `limit` capsules are returned (default 5).
-    Capsules missing required keys are skipped.
+    Capsules missing required keys or with non-conforming filenames are skipped.
     """
     capsules: List[Dict[str, Any]] = []
     if not capsule_dir.exists():
         return capsules
     pattern = f"capsule_{label}_*.json"
     for path in capsule_dir.glob(pattern):
+        # Validate filename format to prevent adversarial capsule injection
+        if not _CAPSULE_FN_RE.match(path.name):
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             # Validate capsule structure (V-18)

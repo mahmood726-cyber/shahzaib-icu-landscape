@@ -10,7 +10,7 @@ import json
 import shutil
 import sys
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 import re
@@ -101,23 +101,28 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
 
 
 def _csv_safe(value: str) -> str:
-    """Guard against CSV formula injection in Excel/Sheets."""
-    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+    """Guard against CSV formula injection in Excel/Sheets.
+
+    Note: '-' excluded — too many false positives in medical data
+    (e.g. '-0.5 mmHg'). Only '=' '+' '@' '\\t' '\\r' are dangerous
+    formula prefixes per OWASP guidance.
+    """
+    if not value:
+        return value
+    if value[0] in ("=", "+", "@", "\t", "\r"):
         return "'" + value
+    # Guard formula chars after embedded newlines
+    for prefix in ("\n=", "\n+", "\n@", "\r=", "\r+", "\r@"):
+        if prefix in value:
+            return "'" + value
     return value
 
 
 @dataclass
 class KeywordStats:
     mention_count: int = 0
-    study_ids: Set[str] = None
-    placebo_study_ids: Set[str] = None
-
-    def __post_init__(self) -> None:
-        if self.study_ids is None:
-            self.study_ids = set()
-        if self.placebo_study_ids is None:
-            self.placebo_study_ids = set()
+    study_ids: Set[str] = field(default_factory=set)
+    placebo_study_ids: Set[str] = field(default_factory=set)
 
 
 def read_csv(path: Path) -> List[Dict[str, str]]:
@@ -130,6 +135,8 @@ def normalize_int(value: Optional[str]) -> int:
     try:
         return int(value) if value is not None and value != "" else 0
     except ValueError:
+        print(f"Warning: non-numeric integer value '{value}', defaulting to 0",
+              file=sys.stderr)
         return 0
 
 
@@ -407,17 +414,17 @@ def build_living_map(
             if enrichment_map:
                 enr = enrichment_map.get(nct_id, {})
                 detailed_row["pub_count"] = str(enr.get("pub_count", 0))
-                detailed_row["pmid_list"] = ";".join(enr.get("pmid_list", []))
-                detailed_row["doi_list"] = ";".join(enr.get("doi_list", []))
-                detailed_row["mesh_terms"] = "|".join(enr.get("mesh_terms", []))
+                detailed_row["pmid_list"] = ";".join(_csv_safe(p) for p in enr.get("pmid_list", []))
+                detailed_row["doi_list"] = ";".join(_csv_safe(d) for d in enr.get("doi_list", []))
+                detailed_row["mesh_terms"] = "|".join(_csv_safe(m) for m in enr.get("mesh_terms", []))
                 detailed_row["cited_by_total"] = str(enr.get("cited_by_total", 0))
                 detailed_row["is_oa"] = str(enr.get("is_oa", False))
                 detailed_row["oa_status"] = enr.get("oa_status") or ""
-                detailed_row["who_trial_id"] = ";".join(enr.get("who_trial_id", []))
-                detailed_row["who_countries"] = enr.get("who_countries", "")
+                detailed_row["who_trial_id"] = ";".join(_csv_safe(t) for t in enr.get("who_trial_id", []))
+                detailed_row["who_countries"] = _csv_safe(enr.get("who_countries", ""))
                 faers = enr.get("faers_top_reactions", [])
                 detailed_row["faers_top_reactions"] = "|".join(
-                    f"{f['drug'].replace('|', ' ').replace('\t', ' ')}\t{f['reaction'].replace('|', ' ').replace('\t', ' ')}\t{f.get('count', 0)}"
+                    f"{_csv_safe(f['drug'].replace('|', ' ').replace('\t', ' '))}\t{_csv_safe(f['reaction'].replace('|', ' ').replace('\t', ' '))}\t{f.get('count', 0)}"
                     for f in faers
                 )
                 detailed_row["enrichment_sources"] = ";".join(enr.get("enrichment_sources", []))
@@ -476,8 +483,8 @@ def build_living_map(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "label": label,
         "source": {
-            "studies_csv": str(studies_csv),
-            "hemo_csv": str(hemo_csv),
+            "studies_csv": studies_csv.name,
+            "hemo_csv": hemo_csv.name,
         },
         "totals": {
             "total_studies": total_studies,

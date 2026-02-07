@@ -308,8 +308,15 @@ def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult
         conn = sqlite3.connect(str(enrich_db))
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout = 30000")
+        # Check oldest of the most-recent fetches per (nct_id, source),
+        # not MIN across all history (which anchors to first-ever fetch)
         row = conn.execute(
-            "SELECT MIN(fetched_utc) FROM enrichment_log WHERE status = 'ok'"
+            """SELECT MIN(latest_utc) FROM (
+                SELECT MAX(fetched_utc) AS latest_utc
+                FROM enrichment_log
+                WHERE status = 'ok'
+                GROUP BY nct_id, source
+            )"""
         ).fetchone()
     except sqlite3.DatabaseError as exc:
         return ValidationResult("P1-enrichment-staleness", "P1", False,

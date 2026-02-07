@@ -83,9 +83,9 @@ def load_config(path: Path) -> Dict:
 
 
 def normalize_text(value: Optional[str]) -> str:
-    if not value:
+    if value is None or value == "":
         return ""
-    return " ".join(value.split())
+    return " ".join(str(value).split())
 
 
 def extract_list(values: Optional[Iterable[str]]) -> List[str]:
@@ -232,9 +232,20 @@ def extract_study_fields(study: Dict) -> Dict[str, str]:
 
 
 def _csv_safe(value: str) -> str:
-    """Guard against CSV formula injection in Excel/Sheets."""
-    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+    """Guard against CSV formula injection in Excel/Sheets.
+
+    Note: '-' excluded — too many false positives in medical data
+    (e.g. '-0.5 mmHg'). Only '=' '+' '@' '\\t' '\\r' are dangerous
+    formula prefixes per OWASP guidance.
+    """
+    if not value:
+        return value
+    if value[0] in ("=", "+", "@", "\t", "\r"):
         return "'" + value
+    # Guard formula chars after embedded newlines
+    for prefix in ("\n=", "\n+", "\n@", "\r=", "\r+", "\r@"):
+        if prefix in value:
+            return "'" + value
     return value
 
 

@@ -351,12 +351,11 @@ class EnrichmentOrchestrator:
         output_path: Path,
     ) -> None:
         """Export per-trial enrichment summaries as JSON for the dashboard."""
-        enrichment: Dict[str, Any] = {}
+        # Use batch method to avoid N+1 DB connections (R7-P0-1)
+        enrichment = self.get_enrichment_summaries(nct_ids)
         coverage: Dict[str, int] = defaultdict(int)
 
-        for nct_id in nct_ids:
-            summary = self.get_enrichment_summary(nct_id)
-            enrichment[nct_id] = summary
+        for nct_id, summary in enrichment.items():
             for source in summary.get("enrichment_sources", []):
                 coverage[source] += 1
 
