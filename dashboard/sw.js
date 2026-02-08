@@ -4,7 +4,8 @@
  * Strategy: Network-first for data files, cache-first for static assets.
  * ────────────────────────────────────────────────────────────────────────── */
 
-const CACHE_NAME = "icu-evidence-map-v1";
+const CACHE_VERSION = 2;
+const CACHE_NAME = `icu-evidence-map-v${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
   "./",

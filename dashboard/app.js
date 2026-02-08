@@ -432,6 +432,7 @@ let focusCondition = "";
 let enrichmentData = null;
 let currentBarMetric = "study_count";
 let currentSummary = null;
+let focusedRowIdx = -1;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 7. Dark mode
@@ -936,7 +937,6 @@ const initVirtualTable = () => {
   tableBody = document.querySelector("#resultsTable tbody");
 
   // Arrow key navigation in table
-  let focusedRowIdx = -1;
   const table = document.getElementById("resultsTable");
   if (table) {
     table.setAttribute("tabindex", "0");
@@ -1073,6 +1073,7 @@ const createTableRow = (row) => {
 
 const renderTable = (rows) => {
   virtualRows = rows;
+  focusedRowIdx = -1;
   const tbody = document.querySelector("#resultsTable tbody");
 
   if (rows.length === 0) {
@@ -1097,14 +1098,18 @@ const renderTable = (rows) => {
     });
   }
 
-  // Update search count
+  // Update search count (rows = displayed, currentFilteredRows = filtered, datasetRows = total)
   const countEl = document.getElementById("searchCount");
   if (countEl) {
     const total = datasetRows.length;
-    if (rows.length < total) {
-      countEl.textContent = `Showing ${formatNumber(rows.length)} of ${formatNumber(total)} studies`;
+    const filtered = currentFilteredRows.length;
+    const displayed = rows.length;
+    if (displayed < filtered) {
+      countEl.textContent = `Showing ${formatNumber(displayed)} of ${formatNumber(filtered)} matching mentions (${formatNumber(total)} total)`;
+    } else if (filtered < total) {
+      countEl.textContent = `${formatNumber(filtered)} of ${formatNumber(total)} mentions match filters`;
     } else {
-      countEl.textContent = "";
+      countEl.textContent = `${formatNumber(total)} outcome mentions`;
     }
   }
 };
@@ -1207,14 +1212,14 @@ const csvEscape = (value) => {
 
 const downloadFilteredCsv = () => {
   const rows = currentFilteredRows || [];
-  if (!rows.length) return;
+  if (!rows.length) { announce("No data to export."); return; }
   const headers = ["nct_id", "measure", "normalized_keyword", "keyword", "normalized_unit", "outcome_type", "conditions", "has_placebo_arm"];
   const lines = [headers.join(",")];
   rows.forEach((row) => {
     const record = headers.map((key) => csvEscape(row[key] || ""));
     lines.push(record.join(","));
   });
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const blobUrl = URL.createObjectURL(blob);
   link.href = blobUrl;
@@ -1228,7 +1233,7 @@ const downloadFilteredCsv = () => {
 // Multi-format export
 const downloadFilteredJson = () => {
   const rows = currentFilteredRows || [];
-  if (!rows.length) return;
+  if (!rows.length) { announce("No data to export."); return; }
   const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   const blobUrl = URL.createObjectURL(blob);
@@ -1242,8 +1247,8 @@ const downloadFilteredJson = () => {
 
 const copyTableToClipboard = () => {
   const rows = currentFilteredRows || [];
-  if (!rows.length) return;
-  const headers = ["nct_id", "measure", "normalized_keyword", "keyword", "normalized_unit", "outcome_type"];
+  if (!rows.length) { announce("No data to copy."); return; }
+  const headers = ["nct_id", "measure", "normalized_keyword", "keyword", "normalized_unit", "outcome_type", "conditions", "has_placebo_arm"];
   const lines = [headers.join("\t")];
   rows.forEach((row) => {
     lines.push(headers.map((k) => (row[k] || "").replace(/\t/g, " ")).join("\t"));
@@ -1502,6 +1507,19 @@ const applyFilters = () => {
     return 0;
   });
 
+  // Update aria-sort on table headers
+  const sortColMap = {
+    nct_id: 0, measure: 1, normalized_keyword: 2,
+    keyword: 3, normalized_unit: 4, outcome_type: 5, has_placebo_arm: 6,
+  };
+  document.querySelectorAll("#resultsTable thead th").forEach((th, idx) => {
+    th.setAttribute("aria-sort",
+      idx === sortColMap[sortKey]
+        ? (sortDir === "asc" ? "ascending" : "descending")
+        : "none"
+    );
+  });
+
   currentFilteredRows = filtered;
   renderTable(filtered.slice(0, rowLimit));
 
@@ -1537,8 +1555,13 @@ const renderedCharts = new Set();
 
 const getFilteredChartRows = (rows) => {
   const crossFilter = FilterState.get();
-  if (Object.keys(crossFilter).length === 0) return rows;
+  const needsFilter = Object.keys(crossFilter).length > 0 || focusCondition;
+  if (!needsFilter) return rows;
   return rows.filter((row) => {
+    // Apply focusCondition filter so charts match the table
+    if (focusCondition) {
+      if (!(row.conditions || "").toLowerCase().includes(focusCondition.toLowerCase())) return false;
+    }
     if (crossFilter.keyword) {
       const kw = (row.normalized_keyword || row.keyword || "").toLowerCase();
       if (!kw.includes(crossFilter.keyword.toLowerCase())) return false;
@@ -1929,6 +1952,10 @@ const onDatasetChange = async (datasetKey) => {
   if (Object.keys(FilterState.get()).length > 0) FilterState.clearAll();
   // Reset lazy chart tracking so all charts re-render with new data
   renderedCharts.clear();
+  // Reset condition focus (stale condition may not exist in new dataset)
+  focusCondition = "";
+  const focusEl = document.getElementById("focusCondition");
+  if (focusEl) focusEl.value = "";
   currentDataset = datasetKey;
   updateDownloadLinks(datasetKey);
   const prevError = document.getElementById("datasetError");

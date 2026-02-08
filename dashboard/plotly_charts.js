@@ -91,6 +91,12 @@ const PlotlyCharts = (() => {
     }
   }
 
+  // Purge old Plotly instance before re-plotting (prevents memory leaks + click handler accumulation)
+  function safePlot(el, data, layout, config) {
+    if (el.data) Plotly.purge(el);
+    return Plotly.newPlot(el, data, layout, config);
+  }
+
   // ── 1. Treemap — Keywords by canonical category ───────────────────
   function renderTreemap(containerId, summary) {
     const el = document.getElementById(containerId);
@@ -124,7 +130,7 @@ const PlotlyCharts = (() => {
 
     const layout = { ...defaultLayout("Hemodynamic Keyword Treemap"), margin: { t: 50, b: 10, l: 10, r: 10 } };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => {
+    safePlot(el, data, layout, defaultConfig).then(() => {
       addExportToolbar("treemap", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0] && d.points[0].label !== "Hemodynamic Keywords") {
@@ -192,7 +198,7 @@ const PlotlyCharts = (() => {
       margin: { t: 50, b: 120, l: 180, r: 20 },
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => {
+    safePlot(el, data, layout, defaultConfig).then(() => {
       addExportToolbar("heatmap", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0]) {
@@ -249,7 +255,7 @@ const PlotlyCharts = (() => {
       legend: { x: 0.02, y: 0.98 },
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => addExportToolbar("timeSeries", containerId));
+    safePlot(el, data, layout, defaultConfig).then(() => addExportToolbar("timeSeries", containerId));
   }
 
   // ── 4. Geographic choropleth ──────────────────────────────────────
@@ -292,7 +298,7 @@ const PlotlyCharts = (() => {
       margin: { t: 50, b: 10, l: 10, r: 10 },
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => {
+    safePlot(el, data, layout, defaultConfig).then(() => {
       addExportToolbar("choropleth", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0]) emitFilter("country", d.points[0].location);
@@ -328,7 +334,7 @@ const PlotlyCharts = (() => {
     }];
 
     const layout = { ...defaultLayout("Hemodynamic Outcome Hierarchy"), margin: { t: 50, b: 10, l: 10, r: 10 } };
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => addExportToolbar("sunburst", containerId));
+    safePlot(el, data, layout, defaultConfig).then(() => addExportToolbar("sunburst", containerId));
   }
 
   // ── 6. PRISMA-S flow (SVG) ────────────────────────────────────────
@@ -356,12 +362,12 @@ const PlotlyCharts = (() => {
     const boxStyle = `rx="8" ry="8" fill="${boxFill}" stroke="${COLORS.accent2}" stroke-width="1.5"`;
     const textStyle = `font-family="Palatino Linotype, serif" font-size="13" fill="${tc.text}" text-anchor="middle"`;
     const smallStyle = `font-family="Palatino Linotype, serif" font-size="11" fill="${tc.muted}" text-anchor="middle"`;
-    const arrowStyle = `stroke="${COLORS.accent2}" stroke-width="1.5" marker-end="url(#arrowhead)"`;
+    const arrowStyle = `stroke="${COLORS.accent2}" stroke-width="1.5" marker-end="url(#prisma-arrowhead)"`;
 
     el.innerHTML = `
       <svg viewBox="0 0 720 440" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:0 auto;display:block" role="img" aria-label="PRISMA-S flow diagram">
         <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <marker id="prisma-arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill="${COLORS.accent2}" />
           </marker>
         </defs>
@@ -427,7 +433,10 @@ const PlotlyCharts = (() => {
 
     // Fruchterman-Reingold layout (100 iterations)
     const N = nodes.length;
-    const pos = nodes.map(() => [Math.random() * 400 - 200, Math.random() * 400 - 200]);
+    const pos = nodes.map((_, i) => {
+      const angle = (2 * Math.PI * i) / Math.max(N, 1);
+      return [150 * Math.cos(angle), 150 * Math.sin(angle)];
+    });
     const area = 400 * 400;
     const k = Math.sqrt(area / Math.max(N, 1));
 
@@ -518,7 +527,7 @@ const PlotlyCharts = (() => {
       margin: { t: 50, b: 10, l: 10, r: 10 },
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => {
+    safePlot(el, data, layout, defaultConfig).then(() => {
       addExportToolbar("network", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0] && d.points[0].text) {
@@ -616,7 +625,7 @@ const PlotlyCharts = (() => {
       margin: { t: 50, b: 120, l: 140, r: 20 },
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => {
+    safePlot(el, data, layout, defaultConfig).then(() => {
       addExportToolbar("bubbleMatrix", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0]) emitFilter("keyword", d.points[0].x);
@@ -701,7 +710,7 @@ const PlotlyCharts = (() => {
       }],
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => {
+    safePlot(el, data, layout, defaultConfig).then(() => {
       addExportToolbar("forestPlot", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0]) emitFilter("keyword", d.points[0].y);
@@ -722,7 +731,9 @@ const PlotlyCharts = (() => {
     const phaseKw = {};
     const seen = {};
 
+    let anonIdx = 0;
     rows.forEach((row) => {
+      anonIdx++;
       const nctId = row.nct_id || "";
       const phase = (row.phase || "Not Stated").replace(/PHASE/gi, "Phase").replace(/NA/i, "Not Stated");
       const kw = row.normalized_keyword || row.keyword || "";
@@ -736,15 +747,15 @@ const PlotlyCharts = (() => {
         sourcePhase[spKey] = (sourcePhase[spKey] || 0) + 1;
       }
 
-      // Keyword count: unique study-keyword pairs
-      const kwKey = `kw\0${nctId || Math.random()}\0${kw}`;
+      // Keyword count: unique study-keyword pairs (deterministic fallback for missing NCT IDs)
+      const kwKey = `kw\0${nctId || `_r${anonIdx}`}\0${kw}`;
       if (!seen[kwKey]) {
         seen[kwKey] = true;
         kwMap[kw] = (kwMap[kw] || 0) + 1;
       }
 
       // Phase → Keyword: unique study per phase-keyword pair
-      const pkKey = `pk\0${nctId || Math.random()}\0${phase}\0${kw}`;
+      const pkKey = `pk\0${nctId || `_r${anonIdx}`}\0${phase}\0${kw}`;
       if (!seen[pkKey]) {
         seen[pkKey] = true;
         const pkLinkKey = `${phase}→${kw}`;
@@ -802,7 +813,7 @@ const PlotlyCharts = (() => {
       margin: { t: 50, b: 10, l: 10, r: 10 },
     };
 
-    Plotly.newPlot(el, data, layout, defaultConfig).then(() => addExportToolbar("sankey", containerId));
+    safePlot(el, data, layout, defaultConfig).then(() => addExportToolbar("sankey", containerId));
   }
 
   // ── 11. Radar/Spider Chart (NEW) ──────────────────────────────────
@@ -868,7 +879,7 @@ const PlotlyCharts = (() => {
       margin: { t: 60, b: 60, l: 60, r: 60 },
     };
 
-    Plotly.newPlot(el, traces, layout, defaultConfig).then(() => addExportToolbar("radar", containerId));
+    safePlot(el, traces, layout, defaultConfig).then(() => addExportToolbar("radar", containerId));
   }
 
   // ── Public API ────────────────────────────────────────────────────

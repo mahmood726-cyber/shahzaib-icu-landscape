@@ -145,9 +145,8 @@ self.addEventListener("message", (event) => {
     const rows = parseCsv(csv);
     self.postMessage({ type: "progress", percent: 60 });
 
-    const aggregation = aggregate(rows);
     self.postMessage({ type: "progress", percent: 100 });
 
-    self.postMessage({ type: "parsed", rows, aggregation });
+    self.postMessage({ type: "parsed", rows });
   }
 });

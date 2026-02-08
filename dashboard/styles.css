@@ -744,7 +744,6 @@ body {
   position: sticky;
   top: 0;
   z-index: 2;
-  cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
@@ -778,6 +777,13 @@ body {
 .results-table tbody tr.is-focused {
   outline: 2px solid var(--clr-primary);
   outline-offset: -2px;
+}
+
+.results-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
 }
 
 /* Virtual scroll container */
@@ -1051,6 +1057,7 @@ body {
 .source-badge-unpaywall { background: #27ae60; }
 .source-badge-who_ictrp { background: #009edb; }
 .source-badge-openfda { background: #7f8c8d; }
+.source-badge-faers { background: #7f8c8d; }
 
 .source-coverage {
   display: grid;
