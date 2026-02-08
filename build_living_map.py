@@ -23,6 +23,20 @@ DEFAULT_OUTPUT_DIR = ROOT / "output"
 DEFAULT_DASHBOARD_DIR = ROOT / "dashboard" / "data"
 DEFAULT_LABEL = "broad"
 
+
+# Categories that are NOT pure hemodynamic parameters. These are included
+# for clinical relevance but are reported separately from core hemodynamic
+# totals to avoid inflating the evidence count.
+#   - ICU Severity Score: SOFA/APACHE/SAPS are multi-organ composite indices;
+#     only the cardiovascular subscore is hemodynamic.
+#   - Ventilation duration: respiratory outcome, not hemodynamic.
+#   - Resuscitation Endpoints: metabolic markers (base deficit, anion gap).
+NON_HEMODYNAMIC_ADJUNCTS = frozenset([
+    "ICU Severity Score",
+    "Ventilation duration",
+    "Resuscitation Endpoints",
+])
+
 CANONICAL_RULES = [
     # Specific multi-word rules MUST come before their general counterparts
     # to prevent substring shadowing (e.g., "vasopressor-free days" must not
@@ -88,6 +102,13 @@ CANONICAL_RULES = [
         "tapse", "global longitudinal strain", "gls",
         "e/e' ratio", "lvot", "velocity time integral", "vti",
     ]),
+    ("Volumetric Hemodynamics", [
+        "global end-diastolic volume", "gedv",
+        "intrathoracic blood volume", "itbv",
+        "extravascular lung water", "evlw",
+    ]),
+    ("Tissue Oxygenation", ["tissue oxygenation", "sto2", "nirs"]),
+    ("dP/dt", ["dp/dt"]),
     ("Resuscitation Endpoints", ["base deficit", "base excess", "anion gap"]),
     ("ICU Severity Score", ["apache ii", "apache", "saps ii", "saps", "qsofa", "sofa", "mods"]),
 ]
@@ -117,6 +138,7 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
     (r"\bdyn(?:es)?\s*\*?\s*s\s*/\s*cm\^?5\b", "dyn*s/cm5"),
     (r"\bwood\s+units?\b", "Wood units"),
     (r"\bwatt(?:s)?\b", "W"),
+    (r"\bmm\s?hg\s*/\s*s\b", "mmHg/s"),
     (r"\bms\b|\bmillisec(?:onds?)?\b", "ms"),
     (r"(?<=\d\s)sec(?:onds)?(?!\w)|(?<=\d)sec(?:onds)?(?!\w)", "s"),
 ]
@@ -258,6 +280,9 @@ KEYWORD_FALLBACK_UNITS: Dict[str, str] = {
     "SVV": "%",
     "PPV": "%",
     "Capillary Refill": "s",
+    "Volumetric Hemodynamics": "mL/m2",
+    "Tissue Oxygenation": "%",
+    "dP/dt": "mmHg/s",
 }
 
 _PERCENT_CONTEXT_RE = re.compile(
@@ -413,6 +438,7 @@ def build_living_map(
 
     total_mentions = 0
     placebo_mentions = 0
+    adjunct_mentions = 0  # Non-hemodynamic adjuncts (severity scores, ventilation, metabolic)
 
     detailed_tmp = detailed_path.with_suffix(".csv.tmp")
     with detailed_tmp.open("w", encoding="utf-8", newline="") as handle:
@@ -497,6 +523,8 @@ def build_living_map(
             writer.writerow(detailed_row)
 
             total_mentions += 1
+            if detailed_row["normalized_keyword"] in NON_HEMODYNAMIC_ADJUNCTS:
+                adjunct_mentions += 1
             studies_with_hemo.add(nct_id)
             if has_placebo:
                 placebo_mentions += 1
@@ -548,6 +576,21 @@ def build_living_map(
     # and enrichment export for deterministic ordering (editor review #9).
     run_timestamp = datetime.now(timezone.utc).isoformat()
 
+    # PRISMA-S compliance: record the search date from the fetch step.
+    # The fetch summary contains search_date_utc per query.
+    search_date_utc = None
+    try:
+        fetch_summary_path = studies_csv.parent.parent / "logs" / "ctgov_icu_fetch_summary.json"
+        if fetch_summary_path.exists():
+            fs = json.loads(fetch_summary_path.read_text(encoding="utf-8"))
+            # Find matching query's search date
+            for qname, qdata in fs.items():
+                if isinstance(qdata, dict) and qdata.get("search_date_utc"):
+                    search_date_utc = qdata["search_date_utc"]
+                    break
+    except (json.JSONDecodeError, OSError, KeyError):
+        pass  # Graceful degradation — search_date is supplementary
+
     # Status stratification (editor review #7)
     status_counts: Dict[str, int] = defaultdict(int)
     for row in studies_rows:
@@ -556,10 +599,14 @@ def build_living_map(
 
     summary = {
         "generated_at": run_timestamp,
+        "search_date_utc": search_date_utc,
         "label": label,
+        "population_scope": "Adult, pediatric, and neonatal ICU (includes PICU/NICU search terms)",
         "source": {
             "studies_csv": studies_csv.name,
             "hemo_csv": hemo_csv.name,
+            "registry": "ClinicalTrials.gov",
+            "api_version": "v2",
         },
         "totals": {
             "total_studies": total_studies,
@@ -567,11 +614,16 @@ def build_living_map(
             "studies_with_hemo_mentions": len(studies_with_hemo),
             "studies_with_hemo_and_placebo": len(studies_with_hemo_and_placebo),
             "total_hemo_mentions": total_mentions,
+            "core_hemo_mentions": total_mentions - adjunct_mentions,
+            "adjunct_mentions": adjunct_mentions,
+            "adjunct_note": "ICU Severity Score, Ventilation duration, and Resuscitation Endpoints are non-hemodynamic adjuncts reported separately",
             "placebo_hemo_mentions": placebo_mentions,
             "non_placebo_hemo_mentions": total_mentions - placebo_mentions,
         },
         "status_stratification": dict(sorted(status_counts.items())),
         "prisma_flow": {
+            "note": "Adapted PRISMA flow for automated evidence gap mapping (not a full PRISMA 2020 flow diagram)",
+            "search_date_utc": search_date_utc,
             "retrieved_from_api": total_studies,
             "valid_nct_ids": total_studies,
             "with_hemodynamic_outcomes": len(studies_with_hemo),

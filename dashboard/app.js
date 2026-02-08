@@ -413,7 +413,12 @@ const updateDownloadLinks = (datasetKey) => {
 };
 
 const renderSummary = (summary) => {
-  document.getElementById("generatedAt").textContent = summary.generated_at || "Unknown";
+  // Show search date if available (PRISMA-S), otherwise build date
+  const searchDate = summary.search_date_utc;
+  const generatedAt = summary.generated_at || "Unknown";
+  document.getElementById("generatedAt").textContent = searchDate
+    ? `Searched ${searchDate.slice(0, 10)}, built ${generatedAt.slice(0, 10)}`
+    : generatedAt;
 
   const totals = summary.totals || {};
   const isSubset = summary.label && summary.label !== "broad";
@@ -425,6 +430,12 @@ const renderSummary = (summary) => {
   document.getElementById("placeboStudies").textContent = formatNumber(totals.studies_with_placebo);
   document.getElementById("hemoPlaceboStudies").textContent = formatNumber(totals.studies_with_hemo_and_placebo);
   document.getElementById("totalMentions").textContent = formatNumber(totals.total_hemo_mentions);
+
+  // M1/M2 fix: show core vs adjunct breakdown
+  const coreEl = document.getElementById("coreHemoMentions");
+  const adjEl = document.getElementById("adjunctMentions");
+  if (coreEl) coreEl.textContent = formatNumber(totals.core_hemo_mentions || totals.total_hemo_mentions);
+  if (adjEl) adjEl.textContent = formatNumber(totals.adjunct_mentions || 0);
 
   document.getElementById("placeboMentions").textContent = `${formatNumber(totals.placebo_hemo_mentions)} placebo-arm mentions`;
   document.getElementById("nonPlaceboMentions").textContent = `${formatNumber(totals.non_placebo_hemo_mentions)} non-placebo mentions`;

@@ -57,6 +57,7 @@ OUTPUT_COLUMNS = [
 SUMMARY_TOTAL_FIELDS = [
     "total_studies", "studies_with_placebo", "studies_with_hemo_mentions",
     "studies_with_hemo_and_placebo", "total_hemo_mentions",
+    "core_hemo_mentions", "adjunct_mentions",
     "placebo_hemo_mentions", "non_placebo_hemo_mentions",
 ]
 
@@ -168,17 +169,24 @@ def validate_nct_format(output_csv: Path) -> ValidationResult:
 
 
 def validate_total_consistency(summary: Dict[str, Any]) -> ValidationResult:
-    """P0-total-consistency: total_hemo == placebo_hemo + non_placebo_hemo."""
+    """P0-total-consistency: total_hemo == placebo + non_placebo == core + adjunct."""
     totals = summary.get("totals", {})
     total = totals.get("total_hemo_mentions", 0)
     placebo = totals.get("placebo_hemo_mentions", 0)
     non_placebo = totals.get("non_placebo_hemo_mentions", 0)
+    core = totals.get("core_hemo_mentions", 0)
+    adjunct = totals.get("adjunct_mentions", 0)
+    problems = []
     if total != placebo + non_placebo:
+        problems.append(f"total({total}) != placebo({placebo}) + non_placebo({non_placebo})")
+    if total != core + adjunct:
+        problems.append(f"total({total}) != core({core}) + adjunct({adjunct})")
+    if problems:
         return ValidationResult(
             "P0-total-consistency", "P0", False,
-            f"total_hemo_mentions({total}) != placebo({placebo}) + non_placebo({non_placebo})")
+            f"Mention totals inconsistent: {'; '.join(problems)}")
     return ValidationResult("P0-total-consistency", "P0", True,
-                            f"Mention totals consistent: {total} = {placebo} + {non_placebo}")
+                            f"Mention totals consistent: {total} = {placebo}+{non_placebo} = {core}+{adjunct}")
 
 
 # ── P1 validators (Warn) ─────────────────────────────────────────────

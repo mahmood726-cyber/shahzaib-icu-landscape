@@ -110,6 +110,16 @@
     "VTI",
     "base deficit",
     "base excess",
-    "anion gap"
+    "anion gap",
+    "global end-diastolic volume",
+    "GEDV",
+    "intrathoracic blood volume",
+    "ITBV",
+    "extravascular lung water",
+    "EVLW",
+    "dP/dt",
+    "tissue oxygenation",
+    "StO2",
+    "NIRS"
   ]
 }

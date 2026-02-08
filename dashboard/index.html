@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hemodynamic Evidence Atlas</title>
+  <title>Hemodynamic Evidence Map</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -14,11 +14,12 @@
   <main class="shell">
     <header class="hero reveal">
       <div class="hero-text">
-        <p class="kicker">ICU RCT Living Map</p>
-        <h1>Hemodynamic Evidence Atlas</h1>
+        <p class="kicker">ICU RCT Living Evidence Gap Map</p>
+        <h1>Hemodynamic Evidence Map</h1>
         <p class="lead">
-          A living snapshot of critical care randomized trials with hemodynamic outcomes,
-          highlighting placebo-arm signals and outcome patterns across ICU conditions.
+          A living evidence gap map of critical care randomized trials with hemodynamic
+          and related ICU outcomes, highlighting placebo-arm signals and outcome patterns.
+          Scope includes adult, pediatric, and neonatal ICU populations.
         </p>
       </div>
       <div class="hero-meta">
@@ -83,7 +84,11 @@
       <div class="card">
         <p class="card-label">Hemodynamic mentions</p>
         <p class="card-value" id="totalMentions">0</p>
-        <p class="card-caption">Total outcome mentions tied to hemodynamics.</p>
+        <p class="card-caption">
+          Total outcome mentions (<span id="coreHemoMentions">0</span> core hemodynamic,
+          <span id="adjunctMentions">0</span> adjunct).
+          Adjuncts: severity scores, ventilation, metabolic endpoints.
+        </p>
       </div>
     </section>
 
@@ -282,18 +287,34 @@
       <div class="panel wide">
         <h3>Search strategy</h3>
         <p class="note">
-          Trials are retrieved from ClinicalTrials.gov (CT.gov) via the API v2 using free-text
-          queries for ICU/critical care terms (intensive care, critical care, ICU, ARDS, ECMO,
-          septic shock, vasopressor, mechanical ventilation, and related synonyms).
-          Only interventional, randomized studies are included.
+          Trials are retrieved from ClinicalTrials.gov (CT.gov) via the <strong>API v2</strong>
+          using free-text <code>query.term</code> queries filtered by
+          <code>AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED</code>.
+          ICU/critical care terms include: intensive care, critical care, ICU, ARDS, ECMO,
+          septic shock, vasopressor, mechanical ventilation, respiratory failure, cardiogenic shock,
+          hemorrhagic shock, organ dysfunction, CCU, MICU, SICU, PICU, NICU, and related synonyms.
+          No date range restriction is applied. Page size: 1000 records. No MeSH structured queries
+          (CT.gov API v2 does not support <code>AREA[ConditionSearch]</code> with MeSH).
+          The search date is recorded in the summary JSON for PRISMA-S compliance.
+        </p>
+        <h3>Population scope</h3>
+        <p class="note">
+          The search includes adult, pediatric (PICU), and neonatal (NICU) intensive care populations.
+          Hemodynamic physiology differs across age groups; users should filter by condition
+          text if age-specific analyses are needed. No age-based exclusion criteria are applied.
         </p>
         <h3>Hemodynamic outcome classification</h3>
         <p class="note">
           Outcome measures, descriptions, and time frames are scanned for hemodynamic keywords
-          using word-boundary matching. Keywords are normalized to canonical categories
+          using word-boundary matching. Keywords are normalized to 24 canonical categories
           (e.g., "norepinephrine" &rarr; Vasopressor/Inotrope, "MAP" &rarr; Mean Arterial Pressure).
-          Ambiguous abbreviations (HR, SV) use negative-context filtering to exclude non-hemodynamic
-          uses (e.g., "HR" as Hazard Ratio is excluded when adjacent to statistical patterns).
+          Ambiguous abbreviations (HR, SV, PAP) use negative-context filtering to exclude
+          non-hemodynamic uses (e.g., "HR" as Hazard Ratio, "PAP" as Pap smear).
+          <strong>Non-hemodynamic adjuncts</strong> (ICU severity scores, ventilation duration,
+          resuscitation endpoints) are included for clinical relevance but are reported separately
+          from core hemodynamic totals to avoid inflating evidence counts.
+          Classification accuracy (sensitivity/specificity) has not been formally validated
+          against a manual screening gold standard.
         </p>
         <h3>Comparator arm classification</h3>
         <p class="note">
@@ -301,14 +322,24 @@
           are classified separately as active comparators. The structured CT.gov <code>armGroupType</code>
           field is used when available; text-based classification is the fallback.
         </p>
+        <h3>Study status handling</h3>
+        <p class="note">
+          All study statuses are included (recruiting, completed, withdrawn, terminated, suspended).
+          Withdrawn trials (never enrolled) and terminated trials (stopped early) may have registered
+          outcomes but never collected data. Status stratification is provided in the summary JSON.
+          Users should consider filtering by status for quantitative analyses.
+        </p>
         <h3>Limitations</h3>
         <ul class="note">
-          <li>ClinicalTrials.gov only &mdash; trials registered solely on other registries are not captured.</li>
-          <li>All study statuses are included (recruiting, completed, withdrawn, terminated).</li>
-          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality.</li>
-          <li>ICU severity scores (SOFA, APACHE) are reported separately as they are composite indices, not pure hemodynamic parameters.</li>
-          <li>Counts are mention-level by default (one study with 3 MAP time points = 3 mentions).</li>
+          <li>ClinicalTrials.gov only &mdash; trials registered solely on other registries (EUCTR, ISRCTN, ANZCTR, ChiCTR) are not captured.</li>
+          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality. Sensitivity/specificity not formally assessed.</li>
+          <li>ICU severity scores (SOFA, APACHE) are composite indices; only the cardiovascular subscore is hemodynamic. Reported as adjuncts.</li>
+          <li>Ventilator-free days and mechanical ventilation duration are respiratory outcomes, included as adjuncts for clinical context.</li>
+          <li>Counts are mention-level by default (one study with 3 MAP time points = 3 mentions). Toggle to study-level in the signal map.</li>
           <li>Geographic bias: CT.gov over-represents US-centric and industry-sponsored trials.</li>
+          <li>No risk of bias / quality appraisal is performed (masking and allocation data are extracted but not synthesized).</li>
+          <li>This evidence gap map is not prospectively registered (PROSPERO/OSF).</li>
+          <li>Adapted PRISMA flow &mdash; not a full PRISMA 2020 flow diagram.</li>
         </ul>
         <h3>Technical notes</h3>
         <p class="note">
@@ -319,7 +350,7 @@
     </section>
 
     <footer class="footer">
-      <p>Built from ClinicalTrials.gov ICU RCT exports.</p>
+      <p>Built from ClinicalTrials.gov ICU RCT exports. Not prospectively registered.</p>
     </footer>
   </main>
 

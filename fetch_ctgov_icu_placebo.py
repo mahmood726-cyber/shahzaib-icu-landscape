@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Tuple
@@ -541,6 +542,7 @@ def run_query(
         finalize_csv(hemo_writer)
 
     return {
+        "search_date_utc": datetime.now(timezone.utc).isoformat(),
         "total_count": total_count,
         "returned_count": total,
         "arm_rows": arm_rows,
