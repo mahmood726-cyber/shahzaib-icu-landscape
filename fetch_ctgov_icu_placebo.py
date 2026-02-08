@@ -104,8 +104,8 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|adjusted\s+hr\b"
         r"|\bahr\b"
         r"|\bchr\b"
-        r"|\bhr\s*[=:]\s*0\.\d"
-        r"|\bhr\s+0\.\d"
+        r"|\bhr\s*[=:]\s*\d+\.\d"
+        r"|\bhr\s+\d+\.\d"
         r"|\bhr\s*\(\s*95\s*%"
         r"|\bhr\s*\[\s*95\s*%"
         r"|\bhr\s*;?\s*95\s*%\s*ci"
@@ -114,21 +114,28 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         re.IGNORECASE,
     ),
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
+    "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
 }
+
+
+def _normalize_quotes(s: str) -> str:
+    """Replace typographic apostrophes/quotes with ASCII for matching."""
+    return s.replace("\u2018", "'").replace("\u2019", "'").replace("\u2032", "'")
 
 
 def keyword_in_text(keyword: str, text: str) -> bool:
     if not keyword or not text:
         return False
-    k = keyword.lower()
-    t = text.lower()
+    k = _normalize_quotes(keyword).lower()
+    t = _normalize_quotes(text).lower()
     # Check negative context for ambiguous abbreviations
     neg_re = _ABBREVIATION_NEGATIVE_CONTEXT.get(k)
     if neg_re and neg_re.search(t):
         return False
     if len(k) <= 3:
-        # Exact word match after splitting on "/" — consistent with build_living_map.py
-        return any(part == k for part in t.replace("/", " ").split())
+        # Exact word match; strip parens/hyphens so "(EF)" matches "ef"
+        parts = t.replace("/", " ").replace("(", " ").replace(")", " ").replace("-", " ").split()
+        return any(part == k for part in parts)
     # Use word boundary to prevent substring matches (e.g., "perfusion"
     # should not match "hypoperfusion") — consistent with build_living_map.py
     return re.search(r"\b" + re.escape(k) + r"\b", t) is not None

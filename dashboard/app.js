@@ -616,8 +616,10 @@ const renderDetail = (nctId) => {
 
 const csvEscape = (value) => {
   let text = String(value ?? "");
-  // Guard against CSV formula injection in Excel/Sheets
-  if (/^[=+\-@\t\r]/.test(text)) {
+  // Guard against CSV formula injection in Excel/Sheets.
+  // Note: '-' excluded to match Python _csv_safe() — too many false positives
+  // in medical data (e.g. '-0.5 mmHg').
+  if (/^[=+@\t\r]/.test(text)) {
     text = "'" + text;
   }
   // Escape embedded double quotes and wrap if needed
@@ -1041,10 +1043,12 @@ const init = async () => {
     applyFilters();
   });
   const barMetricSelect = document.getElementById("barMetric");
-  barMetricSelect.addEventListener("change", (event) => {
-    currentBarMetric = event.target.value;
-    applyFocus();
-  });
+  if (barMetricSelect) {
+    barMetricSelect.addEventListener("change", (event) => {
+      currentBarMetric = event.target.value;
+      applyFocus();
+    });
+  }
 
   await onDatasetChange(currentDataset);
   revealSections();

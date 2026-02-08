@@ -32,7 +32,7 @@ CANONICAL_RULES = [
     ("Ventilation duration", ["ventilator-free days", "mechanical ventilation duration"]),
     ("Shock index", ["shock index"]),
     ("Capillary Refill", ["capillary refill", "capillary refill time"]),
-    ("MAP", ["mean arterial pressure"]),
+    ("MAP", ["mean arterial pressure", "map"]),
     ("Blood Pressure", ["blood pressure", "systolic", "diastolic"]),
     ("Heart Rate", ["heart rate", "hr"]),
     ("Cardiac Output/Index", ["cardiac output", "cardiac index"]),
@@ -54,7 +54,7 @@ CANONICAL_RULES = [
             "scvo2",
         ],
     ),
-    ("Lactate", ["lactate", "lactate clearance"]),
+    ("Lactate", ["lactate clearance", "lactate"]),
     ("Oxygen Delivery", ["oxygen delivery", "do2"]),
     ("Oxygen Consumption", ["oxygen consumption", "vo2"]),
     ("Ejection Fraction", ["ejection fraction", "ef"]),
@@ -89,7 +89,7 @@ CANONICAL_RULES = [
         "e/e' ratio", "lvot", "velocity time integral", "vti",
     ]),
     ("Resuscitation Endpoints", ["base deficit", "base excess", "anion gap"]),
-    ("ICU Severity Score", ["sofa", "apache", "apache ii", "saps", "saps ii", "mods", "qsofa"]),
+    ("ICU Severity Score", ["apache ii", "apache", "saps ii", "saps", "qsofa", "sofa", "mods"]),
 ]
 
 UNIT_PATTERNS: List[Tuple[str, str]] = [
@@ -118,7 +118,7 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
     (r"\bwood\s+units?\b", "Wood units"),
     (r"\bwatt(?:s)?\b", "W"),
     (r"\bms\b|\bmillisec(?:onds?)?\b", "ms"),
-    (r"(?<!\w)(?:\d+(?:\.\d+)?\s*)sec(?:onds)?(?!\w)", "s"),
+    (r"(?<=\d\s)sec(?:onds)?(?!\w)|(?<=\d)sec(?:onds)?(?!\w)", "s"),
 ]
 
 
@@ -178,8 +178,8 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|adjusted\s+hr\b"
         r"|\bahr\b"
         r"|\bchr\b"
-        r"|\bhr\s*[=:]\s*0\.\d"          # HR=0.85 (hazard ratio pattern)
-        r"|\bhr\s+0\.\d"                  # HR 0.85
+        r"|\bhr\s*[=:]\s*\d+\.\d"         # HR=0.85 or HR=1.47 (hazard ratio pattern)
+        r"|\bhr\s+\d+\.\d"                # HR 0.85 or HR 1.47
         r"|\bhr\s*\(\s*95\s*%"            # HR (95% CI
         r"|\bhr\s*\[\s*95\s*%"            # HR [95% CI
         r"|\bhr\s*;?\s*95\s*%\s*ci"       # HR; 95% CI or HR 95% CI
@@ -188,20 +188,28 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         re.IGNORECASE,
     ),
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
+    "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
 }
+
+
+def _normalize_quotes(s: str) -> str:
+    """Replace typographic apostrophes/quotes with ASCII for matching."""
+    return s.replace("\u2018", "'").replace("\u2019", "'").replace("\u2032", "'")
 
 
 def token_in_text(token: str, text: str) -> bool:
     if not token or not text:
         return False
-    token = token.lower()
-    text = text.lower()
+    token = _normalize_quotes(token).lower()
+    text = _normalize_quotes(text).lower()
     # Check negative context for ambiguous abbreviations
     neg_re = _ABBREVIATION_NEGATIVE_CONTEXT.get(token)
     if neg_re and neg_re.search(text):
         return False
     if len(token) <= 3:
-        return any(part == token for part in text.replace("/", " ").split())
+        # Strip parens and hyphens so "(EF)" and "EF-reduced" match "ef"
+        parts = text.replace("/", " ").replace("(", " ").replace(")", " ").replace("-", " ").split()
+        return any(part == token for part in parts)
     # Use word boundary for longer tokens to prevent substring matches
     # (e.g., "perfusion" should not match "hypoperfusion")
     return re.search(r"\b" + re.escape(token) + r"\b", text) is not None
@@ -467,17 +475,21 @@ def build_living_map(
             if enrichment_map:
                 enr = enrichment_map.get(nct_id, {})
                 detailed_row["pub_count"] = str(enr.get("pub_count", 0))
-                detailed_row["pmid_list"] = ";".join(_csv_safe(p) for p in enr.get("pmid_list", []))
-                detailed_row["doi_list"] = ";".join(_csv_safe(d) for d in enr.get("doi_list", []))
-                detailed_row["mesh_terms"] = "|".join(_csv_safe(m) for m in enr.get("mesh_terms", []))
+                detailed_row["pmid_list"] = _csv_safe(";".join(enr.get("pmid_list", [])))
+                detailed_row["doi_list"] = _csv_safe(";".join(enr.get("doi_list", [])))
+                detailed_row["mesh_terms"] = _csv_safe("|".join(enr.get("mesh_terms", [])))
                 detailed_row["cited_by_total"] = str(enr.get("cited_by_total", 0))
                 detailed_row["is_oa"] = str(enr.get("is_oa", False))
                 detailed_row["oa_status"] = enr.get("oa_status") or ""
-                detailed_row["who_trial_id"] = ";".join(_csv_safe(t) for t in enr.get("who_trial_id", []))
+                detailed_row["who_trial_id"] = _csv_safe(";".join(enr.get("who_trial_id", [])))
                 detailed_row["who_countries"] = _csv_safe(enr.get("who_countries", ""))
                 faers = enr.get("faers_top_reactions", [])
                 detailed_row["faers_top_reactions"] = "|".join(
-                    f"{_csv_safe(f['drug'].replace('|', ' ').replace('\t', ' '))}\t{_csv_safe(f['reaction'].replace('|', ' ').replace('\t', ' '))}\t{f.get('count', 0)}"
+                    "{drug}|{reaction}|{count}".format(
+                        drug=_csv_safe(f.get('drug', '').replace('|', ' ')),
+                        reaction=_csv_safe(f.get('reaction', '').replace('|', ' ')),
+                        count=f.get('count', 0),
+                    )
                     for f in faers
                 )
                 detailed_row["enrichment_sources"] = ";".join(enr.get("enrichment_sources", []))

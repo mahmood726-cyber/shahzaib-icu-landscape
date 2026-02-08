@@ -92,7 +92,7 @@ def get_machine_id() -> str:
 def _pct_change(old: int, new: int) -> Optional[float]:
     """Percentage change. Returns None for 0→N (bootstrap, not drift)."""
     if old == 0:
-        return None if new > 0 else 0.0
+        return None if new != 0 else 0.0
     return abs(new - old) / old * 100.0
 
 
@@ -387,17 +387,32 @@ def build_capsule(
       7. Write capsule JSON + append drift ledger
       8. Copy capsule to dashboard/data/ if specified
     """
+    # Validate label to prevent path traversal (defense-in-depth)
+    if not re.match(r"^[a-zA-Z0-9_-]+$", label):
+        raise ValueError(f"Invalid capsule label '{label}': must be alphanumeric/hyphen/underscore")
+
     repo_dir = Path(__file__).resolve().parent
     capsule_dir = output_dir / "capsule"
     capsule_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use caller-provided timestamp for determinism (single timestamp per run)
+    # Use caller-provided timestamp for determinism (single timestamp per run).
+    # datetime.fromisoformat() on Python <3.11 cannot parse timezone offsets
+    # like "+00:00", so we strip it and attach UTC explicitly.
     if run_timestamp:
         generated_utc = run_timestamp
         try:
-            now = datetime.fromisoformat(run_timestamp)
+            # Strip trailing timezone offset for Python <3.11 compat
+            ts = run_timestamp
+            if ts.endswith("+00:00"):
+                ts = ts[:-6]
+            elif ts.endswith("Z"):
+                ts = ts[:-1]
+            now = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
-            now = datetime.now(timezone.utc)
+            raise ValueError(
+                f"Malformed run_timestamp '{run_timestamp}' — capsule generation "
+                "requires a valid ISO 8601 timestamp (fail-closed)"
+            )
     else:
         now = datetime.now(timezone.utc)
         generated_utc = now.isoformat()

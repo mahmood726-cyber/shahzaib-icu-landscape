@@ -192,32 +192,19 @@ class EnrichmentOrchestrator:
                     "Add it to sources/__init__.py before running."
                 )
 
-        # Split sources by phase
-        phase_1 = sorted([s for s in enabled if SOURCE_PHASES[s] == 1])
-        phase_2 = sorted([s for s in enabled if SOURCE_PHASES[s] == 2])
+        # Split sources by phase — dynamically iterate ALL phases present
+        # in SOURCE_PHASES (not just 1 and 2) to avoid silently dropping
+        # sources assigned to phase 3+ (e.g., openfda).
+        all_phases = sorted(set(SOURCE_PHASES[s] for s in enabled))
 
         stats: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-        # Phase 1: NCT ID → PMIDs/DOIs
-        if phase_1:
-            print(f"\n--- Phase 1: {phase_1} ---")
-            for source_name in phase_1:
-                adapter = self._adapters.get(source_name)
-                if not adapter:
-                    continue
-                print(f"  [{source_name}] processing {len(nct_ids)} trials...")
-                for i, nct_id in enumerate(nct_ids):
-                    context = dict(trial_context.get(nct_id, {}))
-                    result = adapter.enrich(nct_id, context)
-                    stats[source_name][result.status] += 1
-                    if (i + 1) % 100 == 0:
-                        print(f"    {i + 1}/{len(nct_ids)} ({result.status})")
-                self._print_source_stats(source_name, stats[source_name])
-
-        # Phase 2: DOI-dependent sources
-        if phase_2:
-            print(f"\n--- Phase 2: {phase_2} ---")
-            for source_name in phase_2:
+        for phase_num in all_phases:
+            phase_sources = sorted([s for s in enabled if SOURCE_PHASES[s] == phase_num])
+            if not phase_sources:
+                continue
+            print(f"\n--- Phase {phase_num}: {phase_sources} ---")
+            for source_name in phase_sources:
                 adapter = self._adapters.get(source_name)
                 if not adapter:
                     continue
