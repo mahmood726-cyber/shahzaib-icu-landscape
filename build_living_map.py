@@ -68,7 +68,8 @@ CANONICAL_RULES = [
             "scvo2",
         ],
     ),
-    ("Lactate", ["lactate clearance", "lactate"]),
+    ("Lactate Clearance", ["lactate clearance"]),
+    ("Lactate", ["lactate"]),
     ("Oxygen Delivery", ["oxygen delivery", "do2"]),
     ("Oxygen Consumption", ["oxygen consumption", "vo2"]),
     ("Ejection Fraction", ["ejection fraction", "ef"]),
@@ -114,6 +115,8 @@ CANONICAL_RULES = [
 ]
 
 UNIT_PATTERNS: List[Tuple[str, str]] = [
+    # mmHg/s MUST come before mmHg (longest match first — P0 unit ordering)
+    (r"\bmm\s?hg\s*/\s*s\b", "mmHg/s"),
     (r"\bmm\s?hg\b", "mmHg"),
     (r"\bcm\s?h2o\b", "cmH2O"),
     (r"\bmmol\s*/\s*l\b|\bmmol per l\b", "mmol/L"),
@@ -138,7 +141,6 @@ UNIT_PATTERNS: List[Tuple[str, str]] = [
     (r"\bdyn(?:es)?\s*\*?\s*s\s*/\s*cm\^?5\b", "dyn*s/cm5"),
     (r"\bwood\s+units?\b", "Wood units"),
     (r"\bwatt(?:s)?\b", "W"),
-    (r"\bmm\s?hg\s*/\s*s\b", "mmHg/s"),
     (r"\bms\b|\bmillisec(?:onds?)?\b", "ms"),
     (r"(?<=\d\s)sec(?:onds)?(?!\w)|(?<=\d)sec(?:onds)?(?!\w)", "s"),
 ]
@@ -229,8 +231,9 @@ def token_in_text(token: str, text: str) -> bool:
     if neg_re and neg_re.search(text):
         return False
     if len(token) <= 3:
-        # Strip parens and hyphens so "(EF)" and "EF-reduced" match "ef"
-        parts = text.replace("/", " ").replace("(", " ").replace(")", " ").replace("-", " ").split()
+        # Strip parens, hyphens, and other delimiters so "(EF)" and "EF-reduced" match "ef"
+        # Include ,;[] so short tokens are found in "MAP,CVP" or "[HR]" contexts
+        parts = text.replace("/", " ").replace("(", " ").replace(")", " ").replace("-", " ").replace(",", " ").replace(";", " ").replace("[", " ").replace("]", " ").split()
         return any(part == token for part in parts)
     # Use word boundary for longer tokens to prevent substring matches
     # (e.g., "perfusion" should not match "hypoperfusion")
@@ -273,6 +276,7 @@ KEYWORD_FALLBACK_UNITS: Dict[str, str] = {
     "Tissue Perfusion": "N/A",
     "Fluid Responsiveness": "N/A",
     "Echocardiographic": "N/A",
+    "Lactate Clearance": "%",
     "Resuscitation Endpoints": "mmol/L",
     "Shock index": "ratio",
     "MAP": "mmHg",

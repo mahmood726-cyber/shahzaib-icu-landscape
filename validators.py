@@ -337,9 +337,17 @@ def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult
         return ValidationResult("P1-enrichment-staleness", "P1", True,
                                 "No enrichment records to check")
     try:
-        oldest = datetime.fromisoformat(row[0])
+        # Python <3.11 fromisoformat() cannot parse "+00:00" TZ suffix — strip it
+        ts_str = row[0]
+        if ts_str.endswith("+00:00"):
+            ts_str = ts_str[:-6]
+        elif ts_str.endswith("Z"):
+            ts_str = ts_str[:-1]
+        oldest = datetime.fromisoformat(ts_str)
         if oldest.tzinfo is None:
             oldest = oldest.replace(tzinfo=timezone.utc)
+        else:
+            oldest = oldest.astimezone(timezone.utc)
         age_days = (datetime.now(timezone.utc) - oldest).total_seconds() / 86400
     except (ValueError, TypeError):
         return ValidationResult("P1-enrichment-staleness", "P1", False,

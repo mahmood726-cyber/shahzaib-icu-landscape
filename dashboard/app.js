@@ -629,7 +629,12 @@ const csvEscape = (value) => {
   // Guard against CSV formula injection in Excel/Sheets.
   // Note: '-' excluded to match Python _csv_safe() — too many false positives
   // in medical data (e.g. '-0.5 mmHg').
-  if (/^[=+@\t\r]/.test(text)) {
+  // Check both leading chars AND embedded newline+formula chars (P1 fix).
+  let needsPrefix = /^[=+@\t\r]/.test(text);
+  if (!needsPrefix) {
+    needsPrefix = /[\n\r][=+@]/.test(text);
+  }
+  if (needsPrefix) {
     text = "'" + text;
   }
   // Escape embedded double quotes and wrap if needed

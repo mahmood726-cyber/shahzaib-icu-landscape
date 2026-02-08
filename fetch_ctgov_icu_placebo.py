@@ -134,8 +134,9 @@ def keyword_in_text(keyword: str, text: str) -> bool:
     if neg_re and neg_re.search(t):
         return False
     if len(k) <= 3:
-        # Exact word match; strip parens/hyphens so "(EF)" matches "ef"
-        parts = t.replace("/", " ").replace("(", " ").replace(")", " ").replace("-", " ").split()
+        # Exact word match; strip parens, hyphens, and other delimiters
+        # Include ,;[] so short tokens are found in "MAP,CVP" or "[HR]" contexts
+        parts = t.replace("/", " ").replace("(", " ").replace(")", " ").replace("-", " ").replace(",", " ").replace(";", " ").replace("[", " ").replace("]", " ").split()
         return any(part == k for part in parts)
     # Use word boundary to prevent substring matches (e.g., "perfusion"
     # should not match "hypoperfusion") — consistent with build_living_map.py

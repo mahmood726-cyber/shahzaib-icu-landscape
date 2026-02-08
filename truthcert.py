@@ -407,7 +407,9 @@ def build_capsule(
                 ts = ts[:-6]
             elif ts.endswith("Z"):
                 ts = ts[:-1]
-            now = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
+            parsed = datetime.fromisoformat(ts)
+            # Use astimezone for TZ-aware datetimes, replace for naive (stripped UTC)
+            now = parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
         except (ValueError, TypeError):
             raise ValueError(
                 f"Malformed run_timestamp '{run_timestamp}' — capsule generation "
