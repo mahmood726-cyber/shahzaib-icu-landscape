@@ -72,30 +72,52 @@ CANONICAL_RULES = [
             "dobutamine",
             "phenylephrine",
             "vasopressin",
+            "milrinone",
+            "levosimendan",
             "inotrope",
             "inotropic",
         ],
     ),
+    ("Tissue Perfusion", ["tissue perfusion", "peripheral perfusion", "perfusion index"]),
     ("Perfusion", ["perfusion"]),
-    ("Severity score", ["sofa", "apache", "apache ii", "saps", "saps ii", "mods", "qsofa"]),
+    ("Fluid Responsiveness", [
+        "passive leg raising", "fluid responsiveness", "fluid challenge",
+        "pulse contour",
+    ]),
+    ("Echocardiographic", [
+        "tapse", "global longitudinal strain", "gls",
+        "e/e' ratio", "lvot", "velocity time integral", "vti",
+    ]),
+    ("Resuscitation Endpoints", ["base deficit", "base excess", "anion gap"]),
+    ("ICU Severity Score", ["sofa", "apache", "apache ii", "saps", "saps ii", "mods", "qsofa"]),
 ]
 
 UNIT_PATTERNS: List[Tuple[str, str]] = [
     (r"\bmm\s?hg\b", "mmHg"),
     (r"\bcm\s?h2o\b", "cmH2O"),
     (r"\bmmol\s*/\s*l\b|\bmmol per l\b", "mmol/L"),
+    (r"\bmeq\s*/\s*l\b", "mEq/L"),
     (r"\bmg\s*/\s*dl\b", "mg/dL"),
+    # Vasopressor dosing units (must come before generic mL/min patterns)
+    (r"\b(?:mcg|ug|µg)\s*/\s*kg\s*/\s*min\b", "mcg/kg/min"),
+    (r"\bng\s*/\s*kg\s*/\s*min\b", "ng/kg/min"),
+    (r"\bunits?\s*/\s*(?:hr|hour|min)\b", "units/hr"),
     (r"\bml\s*/\s*kg\s*/\s*min\b", "mL/kg/min"),
     (r"\bl\s*/\s*min\s*/\s*m2\b|\bl\s*/\s*min\s*/\s*m\^?2\b", "L/min/m2"),
     (r"\bml\s*/\s*min\s*/\s*m2\b|\bml\s*/\s*min\s*/\s*m\^?2\b", "mL/min/m2"),
+    (r"\bml\s*/\s*m2\b|\bml\s*/\s*m\^?2\b", "mL/m2"),
     (r"\bl\s*/\s*min\b", "L/min"),
     (r"\bml\s*/\s*min\b", "mL/min"),
+    (r"\bml\s*/\s*beat\b", "mL/beat"),
     (
         r"\bbeats\s*/\s*min\b|\bbeats per minute\b|\bbpm\b",
         "bpm",
     ),
+    (r"\bdyn(?:es)?\s*\*?\s*s\s*/\s*cm\^?5\s*/\s*m\^?2\b", "dyn*s/cm5/m2"),
     (r"\bdyn(?:es)?\s*\*?\s*s\s*/\s*cm\^?5\b", "dyn*s/cm5"),
+    (r"\bwood\s+units?\b", "Wood units"),
     (r"\bwatt(?:s)?\b", "W"),
+    (r"\bms\b|\bmillisec(?:onds?)?\b", "ms"),
     (r"(?<!\w)(?:\d+(?:\.\d+)?\s*)sec(?:onds)?(?!\w)", "s"),
 ]
 
@@ -146,11 +168,38 @@ def split_list(value: str) -> List[str]:
     return [item.strip() for item in value.split(";") if item.strip()]
 
 
+# Negative-context patterns for ambiguous abbreviations.
+# HR = "Heart Rate" but also "Hazard Ratio" — exclude statistical contexts.
+# SV = "Stroke Volume" but also "SV40" in oncology.
+_ABBREVIATION_NEGATIVE_CONTEXT = {
+    "hr": re.compile(
+        r"(?:"
+        r"hazard\s+ratio"
+        r"|adjusted\s+hr\b"
+        r"|\bahr\b"
+        r"|\bchr\b"
+        r"|\bhr\s*[=:]\s*0\.\d"          # HR=0.85 (hazard ratio pattern)
+        r"|\bhr\s+0\.\d"                  # HR 0.85
+        r"|\bhr\s*\(\s*95\s*%"            # HR (95% CI
+        r"|\bhr\s*\[\s*95\s*%"            # HR [95% CI
+        r"|\bhr\s*;?\s*95\s*%\s*ci"       # HR; 95% CI or HR 95% CI
+        r"|\bhr\s+\d\.\d+\s*[,;(]"        # HR 1.23, or HR 1.23;
+        r")",
+        re.IGNORECASE,
+    ),
+    "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
+}
+
+
 def token_in_text(token: str, text: str) -> bool:
     if not token or not text:
         return False
     token = token.lower()
     text = text.lower()
+    # Check negative context for ambiguous abbreviations
+    neg_re = _ABBREVIATION_NEGATIVE_CONTEXT.get(token)
+    if neg_re and neg_re.search(text):
+        return False
     if len(token) <= 3:
         return any(part == token for part in text.replace("/", " ").split())
     # Use word boundary for longer tokens to prevent substring matches
@@ -183,12 +232,16 @@ def normalize_keyword(keyword: str, text: str) -> str:
 # These are applied only when extract_unit() finds no explicit unit in
 # the measure/matched_text, so explicit units always take precedence.
 KEYWORD_FALLBACK_UNITS: Dict[str, str] = {
-    "Severity score": "score",
+    "ICU Severity Score": "score",
     "Vasopressor-free days": "days",
     "Ventilation duration": "days",
     "Hemodynamics (general)": "N/A",
     "Vasopressor/Inotrope": "varies",
     "Perfusion": "N/A",
+    "Tissue Perfusion": "N/A",
+    "Fluid Responsiveness": "N/A",
+    "Echocardiographic": "N/A",
+    "Resuscitation Endpoints": "mmol/L",
     "Shock index": "ratio",
     "MAP": "mmHg",
     "Blood Pressure": "mmHg",
@@ -479,8 +532,18 @@ def build_living_map(
         1 for row in studies_rows if normalize_int(row.get("placebo_arm_count")) > 0
     )
 
+    # Single timestamp for the entire run — propagated to summary, capsule,
+    # and enrichment export for deterministic ordering (editor review #9).
+    run_timestamp = datetime.now(timezone.utc).isoformat()
+
+    # Status stratification (editor review #7)
+    status_counts: Dict[str, int] = defaultdict(int)
+    for row in studies_rows:
+        status = row.get("overall_status", "Unknown").strip() or "Unknown"
+        status_counts[status] += 1
+
     summary = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": run_timestamp,
         "label": label,
         "source": {
             "studies_csv": studies_csv.name,
@@ -494,6 +557,15 @@ def build_living_map(
             "total_hemo_mentions": total_mentions,
             "placebo_hemo_mentions": placebo_mentions,
             "non_placebo_hemo_mentions": total_mentions - placebo_mentions,
+        },
+        "status_stratification": dict(sorted(status_counts.items())),
+        "prisma_flow": {
+            "retrieved_from_api": total_studies,
+            "valid_nct_ids": total_studies,
+            "with_hemodynamic_outcomes": len(studies_with_hemo),
+            "with_placebo_arms": studies_with_placebo,
+            "with_hemo_and_placebo": len(studies_with_hemo_and_placebo),
+            "excluded_no_hemo": total_studies - len(studies_with_hemo),
         },
         "keywords": sorted(
             [
@@ -609,7 +681,7 @@ def build_living_map(
         if enrichment_map and enrich_db and enrich_db.exists():
             try:
                 enr_output = {
-                    "generated_utc": datetime.now(timezone.utc).isoformat(),
+                    "generated_utc": run_timestamp,
                     "trial_count": len(studies_map),
                     "source_coverage": dict(summary.get("enrichment", {}).get("source_coverage", {})),
                     "trials": enrichment_map,
@@ -621,7 +693,7 @@ def build_living_map(
             except Exception as exc:
                 print(f"Warning: enrichment dashboard export failed: {exc}")
 
-    # TruthCert: build provenance capsule
+    # TruthCert: build provenance capsule (pass run_timestamp for determinism)
     build_capsule(
         label=label,
         studies_csv=studies_csv,
@@ -634,6 +706,7 @@ def build_living_map(
         dashboard_dir=dashboard_dir,
         raw_jsonl=raw_jsonl,
         enrich_db=enrich_db,
+        run_timestamp=run_timestamp,
     )
 
     return summary

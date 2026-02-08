@@ -30,13 +30,12 @@ if str(TOOLING_ROOT) not in sys.path:
 from ctgov_config import DEFAULT_PAGE_SIZE, DEFAULT_RATE_LIMIT, DEFAULT_TIMEOUT, DEFAULT_USER_AGENT  # type: ignore
 from ctgov_utils import get_session, iter_study_pages  # type: ignore
 
+# TRUE placebo tokens — inert comparators only.
+# "usual care" / "standard care" are active comparators, NOT placebos.
+# They are classified separately via COMPARATOR_RULES and comparator_type.
 PLACEBO_TOKENS = (
     "placebo",
     "sham",
-    "usual care",
-    "standard care",
-    "control arm",
-    "control group",
 )
 
 COMPARATOR_RULES = [
@@ -97,13 +96,39 @@ def is_placebo_text(text: str) -> bool:
     return any(token in lowered for token in PLACEBO_TOKENS)
 
 
+# Negative-context patterns for ambiguous abbreviations (shared with build_living_map.py).
+_ABBREVIATION_NEGATIVE_CONTEXT = {
+    "hr": re.compile(
+        r"(?:"
+        r"hazard\s+ratio"
+        r"|adjusted\s+hr\b"
+        r"|\bahr\b"
+        r"|\bchr\b"
+        r"|\bhr\s*[=:]\s*0\.\d"
+        r"|\bhr\s+0\.\d"
+        r"|\bhr\s*\(\s*95\s*%"
+        r"|\bhr\s*\[\s*95\s*%"
+        r"|\bhr\s*;?\s*95\s*%\s*ci"
+        r"|\bhr\s+\d\.\d+\s*[,;(]"
+        r")",
+        re.IGNORECASE,
+    ),
+    "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
+}
+
+
 def keyword_in_text(keyword: str, text: str) -> bool:
     if not keyword or not text:
         return False
     k = keyword.lower()
     t = text.lower()
+    # Check negative context for ambiguous abbreviations
+    neg_re = _ABBREVIATION_NEGATIVE_CONTEXT.get(k)
+    if neg_re and neg_re.search(t):
+        return False
     if len(k) <= 3:
-        return re.search(rf"\b{re.escape(k)}\b", t) is not None
+        # Exact word match after splitting on "/" — consistent with build_living_map.py
+        return any(part == k for part in t.replace("/", " ").split())
     # Use word boundary to prevent substring matches (e.g., "perfusion"
     # should not match "hypoperfusion") — consistent with build_living_map.py
     return re.search(r"\b" + re.escape(k) + r"\b", t) is not None

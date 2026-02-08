@@ -2,53 +2,68 @@
   "sources": {
     "pubmed": {
       "enabled": true,
+      "phase": 1,
       "rate_limit": 3.0,
       "retries": 3,
       "base_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
     },
     "europmc": {
       "enabled": true,
+      "phase": 1,
       "rate_limit": 5.0,
       "retries": 3,
       "base_url": "https://www.ebi.ac.uk/europepmc/webservices/rest"
     },
+    "who_ictrp": {
+      "enabled": true,
+      "phase": 1,
+      "rate_limit": 0,
+      "retries": 1,
+      "base_url": "",
+      "note": "Offline/local CSV source — no HTTP rate limit needed"
+    },
     "openalex": {
       "enabled": true,
+      "phase": 2,
       "rate_limit": 10.0,
       "retries": 3,
-      "base_url": "https://api.openalex.org"
+      "base_url": "https://api.openalex.org",
+      "note": "Phase 2: uses DOIs obtained from Phase 1 sources"
     },
     "crossref": {
       "enabled": true,
+      "phase": 2,
       "rate_limit": 5.0,
       "retries": 3,
       "base_url": "https://api.crossref.org"
     },
     "opencitations": {
       "enabled": true,
+      "phase": 2,
       "rate_limit": 5.0,
       "retries": 3,
       "base_url": "https://opencitations.net/index/coci/api/v1"
     },
     "unpaywall": {
       "enabled": true,
+      "phase": 2,
       "rate_limit": 10.0,
       "retries": 3,
       "base_url": "https://api.unpaywall.org/v2",
       "email": ""
     },
-    "who_ictrp": {
-      "enabled": true,
-      "rate_limit": 0,
-      "retries": 1,
-      "base_url": ""
-    },
     "openfda": {
       "enabled": true,
+      "phase": 3,
       "rate_limit": 4.0,
       "retries": 3,
-      "base_url": "https://api.fda.gov/drug/event.json"
+      "base_url": "https://api.fda.gov/drug/event.json",
+      "note": "Phase 3: FAERS post-market safety signals — separate from trial outcomes"
     }
+  },
+  "phase_ordering": {
+    "description": "Phase 1 sources (PubMed, EuropePMC, WHO ICTRP) provide PMIDs and DOIs. Phase 2 sources (OpenAlex, Crossref, Unpaywall, OpenCitations) use DOIs from Phase 1. Phase 3 (OpenFDA) is independent safety surveillance data.",
+    "phases": [1, 2, 3]
   },
   "max_age_days": 30,
   "email": ""

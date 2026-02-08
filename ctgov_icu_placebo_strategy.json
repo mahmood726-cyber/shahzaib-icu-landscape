@@ -3,16 +3,23 @@
   "description": "ICU/critical care RCTs, with a placebo/sham/usual-care comparator; use query.term for CT.gov API v2.",
   "queries": {
     "icu_rct_broad": {
-      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\")"
+      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU)"
     },
     "icu_rct_placebo": {
-      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\") AND (placebo OR sham OR \"standard care\" OR \"usual care\")"
+      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU) AND (placebo OR sham OR \"standard care\" OR \"usual care\")"
     }
   },
   "notes": {
-    "status_filter": "none",
+    "status_filter": "none — all statuses included; dashboard shows status stratification",
     "page_size": 1000,
-    "use_for": "CT.gov API v2 query.term parameter"
+    "use_for": "CT.gov API v2 query.term parameter",
+    "limitations": [
+      "ClinicalTrials.gov only — trials registered only on other registries (EUCTR, ISRCTN, ANZCTR, ChiCTR, etc.) are not captured",
+      "Free-text search — no MeSH structured field queries (CT.gov v2 does not support AREA[ConditionSearch] with MeSH)",
+      "All study statuses included (recruiting, completed, withdrawn, terminated) — filter by status in downstream analysis",
+      "Geographic bias toward US-centric and industry-sponsored trials due to CT.gov registration patterns"
+    ],
+    "search_terms_added_v2": "ARDS, acute respiratory distress, respiratory failure, cardiogenic shock, hemorrhagic shock, ECMO, extracorporeal membrane oxygenation, multi-organ failure, organ dysfunction, CCU, MICU, SICU, PICU, NICU"
   },
   "hemodynamic_keywords": [
     "hemodynamic",
@@ -74,8 +81,13 @@
     "dobutamine",
     "phenylephrine",
     "vasopressin",
+    "milrinone",
+    "levosimendan",
     "shock index",
     "perfusion",
+    "tissue perfusion",
+    "peripheral perfusion",
+    "perfusion index",
     "ventilator-free days",
     "mechanical ventilation duration",
     "SOFA",
@@ -84,6 +96,20 @@
     "SAPS",
     "SAPS II",
     "MODS",
-    "qSOFA"
+    "qSOFA",
+    "passive leg raising",
+    "fluid responsiveness",
+    "fluid challenge",
+    "pulse contour",
+    "TAPSE",
+    "global longitudinal strain",
+    "GLS",
+    "E/e' ratio",
+    "LVOT",
+    "velocity time integral",
+    "VTI",
+    "base deficit",
+    "base excess",
+    "anion gap"
   ]
 }

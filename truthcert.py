@@ -43,6 +43,11 @@ def compute_file_hash(path: Path) -> str:
     return f"sha256:{sha.hexdigest()}"
 
 
+# Semantic version for the ontology — update when rules change.
+# Format: "v{major}.{minor} — {description}"
+ONTOLOGY_SEMANTIC_VERSION = "v2.0 — added fluid responsiveness, echo params, resuscitation endpoints, ICU severity score separation, HR/SV negative context, milrinone/levosimendan, tissue perfusion specificity"
+
+
 def compute_ontology_version(
     canonical_rules: List[Tuple[str, List[str]]],
     unit_patterns: List[Tuple[str, str]],
@@ -369,6 +374,7 @@ def build_capsule(
     dashboard_dir: Optional[Path] = None,
     raw_jsonl: Optional[Path] = None,
     enrich_db: Optional[Path] = None,
+    run_timestamp: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Build a TruthCert capsule:
@@ -385,10 +391,18 @@ def build_capsule(
     capsule_dir = output_dir / "capsule"
     capsule_dir.mkdir(parents=True, exist_ok=True)
 
-    now = datetime.now(timezone.utc)
+    # Use caller-provided timestamp for determinism (single timestamp per run)
+    if run_timestamp:
+        generated_utc = run_timestamp
+        try:
+            now = datetime.fromisoformat(run_timestamp)
+        except (ValueError, TypeError):
+            now = datetime.now(timezone.utc)
+    else:
+        now = datetime.now(timezone.utc)
+        generated_utc = now.isoformat()
     timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
     capsule_id = f"TC-{label}-{timestamp}"
-    generated_utc = now.isoformat()
 
     # 1. Hash inputs/outputs
     input_hashes: Dict[str, str] = {}
@@ -448,6 +462,7 @@ def build_capsule(
         "machine_id": get_machine_id(),
         "python_version": platform.python_version(),
         "ontology_version": ontology_version,
+        "ontology_semantic_version": ONTOLOGY_SEMANTIC_VERSION,
         "input_hashes": input_hashes,
         "output_hashes": output_hashes,
         "validations": [v.to_dict() for v in validations],

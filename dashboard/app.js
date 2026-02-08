@@ -403,6 +403,7 @@ let selectedNctId = null;
 let currentFilteredRows = [];
 let focusCondition = "";
 let enrichmentData = null;
+let currentBarMetric = "study_count";
 
 const updateDownloadLinks = (datasetKey) => {
   const config = datasetConfig[datasetKey];
@@ -450,9 +451,13 @@ const renderCharts = (stats) => {
   const conditions = sortByMentions(stats.conditions || [], "mention_count");
   const outcomes = sortByMentions(stats.outcome_types || [], "mention_count");
 
-  renderBars(keywordBars, keywords, "keyword", "mention_count", 12);
-  renderBars(conditionBars, conditions, "condition", "mention_count", 12);
-  renderBars(outcomeBars, outcomes, "outcome_type", "mention_count", 6);
+  // Default to study_count for evidence-gap-map relevance (editor review #16).
+  // study_count shows unique trials per category; mention_count inflates
+  // categories with many time-point outcomes.
+  const barMetric = currentBarMetric || "study_count";
+  renderBars(keywordBars, keywords, "keyword", barMetric, 12);
+  renderBars(conditionBars, conditions, "condition", barMetric, 12);
+  renderBars(outcomeBars, outcomes, "outcome_type", barMetric, 6);
 
   const outcomeFilter = document.getElementById("outcomeFilter");
   const previousOutcome = outcomeFilter.value;
@@ -1034,6 +1039,11 @@ const init = async () => {
     focusCondition = event.target.value;
     applyFocus();
     applyFilters();
+  });
+  const barMetricSelect = document.getElementById("barMetric");
+  barMetricSelect.addEventListener("change", (event) => {
+    currentBarMetric = event.target.value;
+    applyFocus();
   });
 
   await onDatasetChange(currentDataset);

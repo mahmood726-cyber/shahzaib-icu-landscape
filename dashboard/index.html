@@ -71,9 +71,9 @@
         <p class="card-caption">Trials with hemodynamic outcome mentions.</p>
       </div>
       <div class="card">
-        <p class="card-label">Placebo-arm trials</p>
+        <p class="card-label">Placebo/sham trials</p>
         <p class="card-value" id="placeboStudies">0</p>
-        <p class="card-caption">Trials listing placebo/sham/usual care arms.</p>
+        <p class="card-caption">Trials with true placebo or sham comparator arms (excludes usual care / standard care).</p>
       </div>
       <div class="card">
         <p class="card-label">Hemo + placebo trials</p>
@@ -97,6 +97,13 @@
           Condition focus
           <select id="focusCondition">
             <option value="">All conditions</option>
+          </select>
+        </label>
+        <label>
+          Bar metric
+          <select id="barMetric">
+            <option value="study_count" selected>Studies</option>
+            <option value="mention_count">Mentions</option>
           </select>
         </label>
         <p class="focus-stats" id="focusStats">Showing all conditions.</p>
@@ -168,7 +175,7 @@
           </label>
           <label class="checkbox">
             <input id="placeboOnly" type="checkbox" />
-            Placebo-arm only
+            Placebo/sham only
           </label>
           <label>
             Sort by
@@ -269,10 +276,41 @@
 
     <section class="section reveal">
       <div class="section-header">
-        <h2>Notes</h2>
-        <p>Hemodynamic keywords are detected in outcome text; counts are mention-based.</p>
+        <h2>Methods</h2>
+        <p>Search strategy, classification, and known limitations.</p>
       </div>
       <div class="panel wide">
+        <h3>Search strategy</h3>
+        <p class="note">
+          Trials are retrieved from ClinicalTrials.gov (CT.gov) via the API v2 using free-text
+          queries for ICU/critical care terms (intensive care, critical care, ICU, ARDS, ECMO,
+          septic shock, vasopressor, mechanical ventilation, and related synonyms).
+          Only interventional, randomized studies are included.
+        </p>
+        <h3>Hemodynamic outcome classification</h3>
+        <p class="note">
+          Outcome measures, descriptions, and time frames are scanned for hemodynamic keywords
+          using word-boundary matching. Keywords are normalized to canonical categories
+          (e.g., "norepinephrine" &rarr; Vasopressor/Inotrope, "MAP" &rarr; Mean Arterial Pressure).
+          Ambiguous abbreviations (HR, SV) use negative-context filtering to exclude non-hemodynamic
+          uses (e.g., "HR" as Hazard Ratio is excluded when adjacent to statistical patterns).
+        </p>
+        <h3>Comparator arm classification</h3>
+        <p class="note">
+          "Placebo/sham" refers to true inert comparators only. Usual care and standard care
+          are classified separately as active comparators. The structured CT.gov <code>armGroupType</code>
+          field is used when available; text-based classification is the fallback.
+        </p>
+        <h3>Limitations</h3>
+        <ul class="note">
+          <li>ClinicalTrials.gov only &mdash; trials registered solely on other registries are not captured.</li>
+          <li>All study statuses are included (recruiting, completed, withdrawn, terminated).</li>
+          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality.</li>
+          <li>ICU severity scores (SOFA, APACHE) are reported separately as they are composite indices, not pure hemodynamic parameters.</li>
+          <li>Counts are mention-level by default (one study with 3 MAP time points = 3 mentions).</li>
+          <li>Geographic bias: CT.gov over-represents US-centric and industry-sponsored trials.</li>
+        </ul>
+        <h3>Technical notes</h3>
         <p class="note">
           If you open this file directly and charts are empty, run a local server from
           the dashboard folder: <span class="code">python -m http.server 8000</span>.
