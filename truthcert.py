@@ -89,10 +89,18 @@ def get_machine_id() -> str:
 
 # ── Drift Detection ──────────────────────────────────────────────────
 
-def _pct_change(old: int, new: int) -> Optional[float]:
-    """Percentage change. Returns None for 0→N (bootstrap, not drift)."""
+def _pct_change(old: int, new: int, has_prev_capsule: bool = False) -> Optional[float]:
+    """Percentage change. Returns None only for true first-run bootstrap (no prev capsule).
+
+    When a previous capsule exists, 0→N is flagged as major drift (likely
+    recovery from a failed fetch), not silently suppressed as bootstrap.
+    """
     if old == 0:
-        return None if new != 0 else 0.0
+        if new == 0:
+            return 0.0
+        # True bootstrap (no previous capsule): suppress drift
+        # Recovery from error (prev capsule had 0): flag as major
+        return 100.0 if has_prev_capsule else None
     return abs(new - old) / old * 100.0
 
 
@@ -122,8 +130,8 @@ def detect_drift(
     old_trials = prev_totals.get("total_studies", 0)
     new_trials = current_totals.get("total_studies", 0)
     if old_trials != new_trials:
-        pct = _pct_change(old_trials, new_trials)
-        if pct is not None:  # None = bootstrap (0→N), not drift
+        pct = _pct_change(old_trials, new_trials, has_prev_capsule=True)
+        if pct is not None:  # None = true first-run bootstrap only
             events.append({
                 "metric": "total_studies",
                 "old": old_trials,
@@ -136,7 +144,7 @@ def detect_drift(
     old_hemo = prev_totals.get("total_hemo_mentions", 0)
     new_hemo = current_totals.get("total_hemo_mentions", 0)
     if old_hemo != new_hemo:
-        pct = _pct_change(old_hemo, new_hemo)
+        pct = _pct_change(old_hemo, new_hemo, has_prev_capsule=True)
         if pct is not None:
             events.append({
                 "metric": "total_hemo_mentions",

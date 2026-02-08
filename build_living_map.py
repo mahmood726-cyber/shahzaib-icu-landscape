@@ -445,6 +445,7 @@ def build_living_map(
     total_mentions = 0
     placebo_mentions = 0
     adjunct_mentions = 0  # Non-hemodynamic adjuncts (severity scores, ventilation, metabolic)
+    orphan_nct_ids: Set[str] = set()  # hemo NCT IDs missing from studies CSV
 
     detailed_tmp = detailed_path.with_suffix(".csv.tmp")
     with detailed_tmp.open("w", encoding="utf-8", newline="") as handle:
@@ -456,6 +457,8 @@ def build_living_map(
             if not nct_id:
                 continue
             study = studies_map.get(nct_id, {})
+            if not study:
+                orphan_nct_ids.add(nct_id)
             placebo_arm_count = normalize_int(study.get("placebo_arm_count"))
             has_placebo = placebo_arm_count > 0
 
@@ -575,6 +578,14 @@ def build_living_map(
 
     detailed_tmp.replace(detailed_path)
 
+    # Warn about orphan NCT IDs (hemo mentions without study metadata)
+    if orphan_nct_ids:
+        print(
+            f"Warning: {len(orphan_nct_ids)} NCT ID(s) in hemo CSV not found in studies CSV "
+            f"(orphan rows with blank metadata): {sorted(orphan_nct_ids)[:5]}",
+            file=sys.stderr,
+        )
+
     total_studies = len(studies_map)
     studies_with_placebo = sum(
         1 for row in studies_rows if normalize_int(row.get("placebo_arm_count")) > 0
@@ -627,6 +638,7 @@ def build_living_map(
             "adjunct_note": "ICU Severity Score, Ventilation duration, and Resuscitation Endpoints are non-hemodynamic adjuncts reported separately",
             "placebo_hemo_mentions": placebo_mentions,
             "non_placebo_hemo_mentions": total_mentions - placebo_mentions,
+            "orphan_hemo_nct_ids": len(orphan_nct_ids),
         },
         "status_stratification": dict(sorted(status_counts.items())),
         "prisma_flow": {

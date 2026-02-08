@@ -137,7 +137,7 @@ def validate_schema_output(output_csv: Path) -> ValidationResult:
 
 
 def validate_summary_totals(summary: Dict[str, Any]) -> ValidationResult:
-    """P0-summary-totals: All 7 total fields present and non-negative integers."""
+    """P0-summary-totals: All expected total fields present and non-negative integers."""
     totals = summary.get("totals", {})
     problems: List[str] = []
     for field in SUMMARY_TOTAL_FIELDS:
@@ -150,7 +150,7 @@ def validate_summary_totals(summary: Dict[str, Any]) -> ValidationResult:
         return ValidationResult("P0-summary-totals", "P0", False,
                                 f"Summary totals issues: {'; '.join(problems)}")
     return ValidationResult("P0-summary-totals", "P0", True,
-                            "All 7 summary total fields are valid non-negative integers")
+                            f"All {len(SUMMARY_TOTAL_FIELDS)} summary total fields are valid non-negative integers")
 
 
 def validate_nct_format(output_csv: Path) -> ValidationResult:
@@ -187,6 +187,18 @@ def validate_total_consistency(summary: Dict[str, Any]) -> ValidationResult:
             f"Mention totals inconsistent: {'; '.join(problems)}")
     return ValidationResult("P0-total-consistency", "P0", True,
                             f"Mention totals consistent: {total} = {placebo}+{non_placebo} = {core}+{adjunct}")
+
+
+def validate_referential_integrity(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-referential-integrity: No orphan hemo NCT IDs missing from studies CSV."""
+    totals = summary.get("totals", {})
+    orphans = totals.get("orphan_hemo_nct_ids", 0)
+    if orphans > 0:
+        return ValidationResult(
+            "P1-referential-integrity", "P1", False,
+            f"{orphans} hemo NCT ID(s) not found in studies CSV (orphan rows with blank metadata)")
+    return ValidationResult("P1-referential-integrity", "P1", True,
+                            "All hemo NCT IDs have corresponding study records")
 
 
 # ── P1 validators (Warn) ─────────────────────────────────────────────
@@ -436,6 +448,7 @@ def run_validators(
         validate_nct_format(output_csv),
         validate_total_consistency(summary),
         # P1 — Warn
+        validate_referential_integrity(summary),
         validate_keyword_coverage(summary, config_keywords),
         validate_normalization_coverage(summary),
         validate_unit_coverage(summary),
