@@ -153,13 +153,13 @@ def _csv_safe(value: str) -> str:
     """
     if not value:
         return value
-    if value[0] in ("=", "+", "@", "\t", "\r"):
-        return "'" + value
-    # Guard formula chars after embedded newlines
-    for prefix in ("\n=", "\n+", "\n@", "\r=", "\r+", "\r@"):
-        if prefix in value:
-            return "'" + value
-    return value
+    needs_prefix = value[0] in ("=", "+", "@", "\t", "\r")
+    if not needs_prefix:
+        for prefix in ("\n=", "\n+", "\n@", "\r=", "\r+", "\r@"):
+            if prefix in value:
+                needs_prefix = True
+                break
+    return "'" + value if needs_prefix else value
 
 
 @dataclass
@@ -253,7 +253,9 @@ def normalize_keyword(keyword: str, text: str) -> str:
         for token in tokens:
             if token_in_text(token, combined):
                 return canonical
-    return keyword.strip() or "Unmapped"
+    # No canonical rule matched — mark as "Unmapped" so TruthCert
+    # abstention checker correctly flags these keywords.
+    return "Unmapped"
 
 
 # Fallback units for canonical keywords where:
@@ -505,15 +507,17 @@ def build_living_map(
                 detailed_row["doi_list"] = _csv_safe(";".join(enr.get("doi_list", [])))
                 detailed_row["mesh_terms"] = _csv_safe("|".join(enr.get("mesh_terms", [])))
                 detailed_row["cited_by_total"] = str(enr.get("cited_by_total", 0))
-                detailed_row["is_oa"] = str(enr.get("is_oa", False))
+                detailed_row["is_oa"] = str(bool(enr.get("is_oa", False))).lower()
                 detailed_row["oa_status"] = enr.get("oa_status") or ""
                 detailed_row["who_trial_id"] = _csv_safe(";".join(enr.get("who_trial_id", [])))
                 detailed_row["who_countries"] = _csv_safe(enr.get("who_countries", ""))
                 faers = enr.get("faers_top_reactions", [])
-                detailed_row["faers_top_reactions"] = "|".join(
-                    "{drug}|{reaction}|{count}".format(
-                        drug=_csv_safe(f.get('drug', '').replace('|', ' ')),
-                        reaction=_csv_safe(f.get('reaction', '').replace('|', ' ')),
+                # Use ;; between records and :: between fields within a record
+                # to avoid delimiter collision (P0 fix — prior version used | for both)
+                detailed_row["faers_top_reactions"] = ";;".join(
+                    "{drug}::{reaction}::{count}".format(
+                        drug=f.get('drug', '').replace('::', ': '),
+                        reaction=f.get('reaction', '').replace('::', ': '),
                         count=f.get('count', 0),
                     )
                     for f in faers

@@ -273,13 +273,13 @@ def _csv_safe(value: str) -> str:
     """
     if not value:
         return value
-    if value[0] in ("=", "+", "@", "\t", "\r"):
-        return "'" + value
-    # Guard formula chars after embedded newlines
-    for prefix in ("\n=", "\n+", "\n@", "\r=", "\r+", "\r@"):
-        if prefix in value:
-            return "'" + value
-    return value
+    needs_prefix = value[0] in ("=", "+", "@", "\t", "\r")
+    if not needs_prefix:
+        for prefix in ("\n=", "\n+", "\n@", "\r=", "\r+", "\r@"):
+            if prefix in value:
+                needs_prefix = True
+                break
+    return "'" + value if needs_prefix else value
 
 
 def open_csv(path: Path, header: List[str]) -> csv.DictWriter:

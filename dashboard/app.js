@@ -458,14 +458,13 @@ const renderCharts = (stats) => {
   const conditionBars = document.getElementById("conditionBars");
   const outcomeBars = document.getElementById("outcomeBars");
 
-  const keywords = sortByMentions(stats.keywords || [], "mention_count");
-  const conditions = sortByMentions(stats.conditions || [], "mention_count");
-  const outcomes = sortByMentions(stats.outcome_types || [], "mention_count");
-
   // Default to study_count for evidence-gap-map relevance (editor review #16).
-  // study_count shows unique trials per category; mention_count inflates
-  // categories with many time-point outcomes.
+  // Sort by the SAME metric used for bar display so rank order matches bar width.
   const barMetric = currentBarMetric || "study_count";
+  const keywords = sortByMentions(stats.keywords || [], barMetric);
+  const conditions = sortByMentions(stats.conditions || [], barMetric);
+  const outcomes = sortByMentions(stats.outcome_types || [], barMetric);
+
   renderBars(keywordBars, keywords, "keyword", barMetric, 12);
   renderBars(conditionBars, conditions, "condition", barMetric, 12);
   renderBars(outcomeBars, outcomes, "outcome_type", barMetric, 6);
@@ -1057,7 +1056,19 @@ const init = async () => {
   if (barMetricSelect) {
     barMetricSelect.addEventListener("change", (event) => {
       currentBarMetric = event.target.value;
-      applyFocus();
+      // Re-render bars only (not dropdowns) — bar metric change doesn't alter data
+      const rows = focusCondition
+        ? datasetRows.filter((r) =>
+            (r.conditions || "").toLowerCase().includes(focusCondition.toLowerCase()))
+        : datasetRows;
+      const stats = aggregateRows(rows);
+      const barMetric = currentBarMetric || "study_count";
+      const keywords = sortByMentions(stats.keywords || [], barMetric);
+      const conditions = sortByMentions(stats.conditions || [], barMetric);
+      const outcomes = sortByMentions(stats.outcome_types || [], barMetric);
+      renderBars(document.getElementById("keywordBars"), keywords, "keyword", barMetric, 12);
+      renderBars(document.getElementById("conditionBars"), conditions, "condition", barMetric, 12);
+      renderBars(document.getElementById("outcomeBars"), outcomes, "outcome_type", barMetric, 6);
     });
   }
 
