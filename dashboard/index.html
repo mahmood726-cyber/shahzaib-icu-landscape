@@ -3,15 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="ICU RCT Living Evidence Gap Map — interactive dashboard of critical care randomized trials with hemodynamic and related ICU outcomes." />
   <title>Hemodynamic Evidence Map</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="lib/plotly.min.js" defer></script>
 </head>
 <body>
+  <!-- Skip link for accessibility -->
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <!-- Dark mode toggle -->
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+    <span class="icon-sun" aria-hidden="true">&#9728;</span>
+    <span class="icon-moon" aria-hidden="true">&#9790;</span>
+  </button>
+
+  <!-- Offline badge -->
+  <div class="offline-badge" id="offlineBadge" role="status" aria-live="polite">Offline</div>
+
   <div class="bg-orb orb-1" aria-hidden="true"></div>
   <div class="bg-orb orb-2" aria-hidden="true"></div>
   <div class="bg-grid" aria-hidden="true"></div>
 
-  <main class="shell">
+  <!-- Study detail sidebar -->
+  <div class="study-sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  <aside class="study-sidebar" id="studySidebar" role="complementary" aria-label="Study details" aria-hidden="true">
+    <button class="sidebar-close" id="sidebarClose" aria-label="Close study details">&times;</button>
+    <div id="sidebarContent">
+      <p class="note">Select a study to see details.</p>
+    </div>
+  </aside>
+
+  <main class="shell" id="main">
     <header class="hero reveal">
       <div class="hero-text">
         <p class="kicker">ICU RCT Living Evidence Gap Map</p>
@@ -21,11 +44,18 @@
           and related ICU outcomes, highlighting placebo-arm signals and outcome patterns.
           Scope includes adult, pediatric, and neonatal ICU populations.
         </p>
+        <!-- Global search -->
+        <div class="global-search" style="margin-top:16px">
+          <span class="search-icon" aria-hidden="true">&#128269;</span>
+          <input type="search" id="globalSearch" placeholder="Search studies... (e.g., keyword:MAP, country:USA)" aria-label="Search studies" />
+        </div>
+        <p class="search-count" id="searchCount" aria-live="polite"></p>
       </div>
       <div class="hero-meta">
         <div class="meta-card">
           <p class="meta-label">Last generated</p>
           <p class="meta-value" id="generatedAt">Loading...</p>
+          <p class="meta-freshness" id="freshness"></p>
         </div>
         <div class="meta-card">
           <p class="meta-label">Data</p>
@@ -35,7 +65,7 @@
         <div class="meta-card">
           <p class="meta-label">Dataset</p>
           <div class="select-wrap">
-            <select id="datasetSelect">
+            <select id="datasetSelect" aria-label="Dataset selection">
               <option value="broad">All ICU RCTs</option>
               <option value="placebo">Placebo-arm subset</option>
             </select>
@@ -60,7 +90,13 @@
       </div>
     </header>
 
-    <section class="cards reveal">
+    <!-- Filter chips bar -->
+    <div class="filter-chips" id="filterChips" aria-label="Active filters"></div>
+
+    <!-- Live region for announcements -->
+    <div id="liveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <section class="cards reveal" aria-label="Summary statistics">
       <div class="card">
         <p class="card-label" id="totalStudiesLabel">Total ICU RCTs</p>
         <p class="card-value" id="totalStudies">0</p>
@@ -92,7 +128,7 @@
       </div>
     </section>
 
-    <section class="section reveal">
+    <section class="section reveal" aria-label="Signal map">
       <div class="section-header">
         <h2>Signal map</h2>
         <p>Top hemodynamic keywords and the ICU conditions they appear in.</p>
@@ -100,13 +136,13 @@
       <div class="focus-bar">
         <label>
           Condition focus
-          <select id="focusCondition">
+          <select id="focusCondition" aria-label="Condition focus filter">
             <option value="">All conditions</option>
           </select>
         </label>
         <label>
           Bar metric
-          <select id="barMetric">
+          <select id="barMetric" aria-label="Bar chart metric">
             <option value="study_count" selected>Studies</option>
             <option value="mention_count">Mentions</option>
           </select>
@@ -116,32 +152,32 @@
       <div class="split">
         <div class="panel">
           <h3>Top hemodynamic keywords</h3>
-          <div class="bar-list" id="keywordBars"></div>
+          <div class="bar-list" id="keywordBars" role="img" aria-label="Bar chart of top hemodynamic keywords"></div>
         </div>
         <div class="panel">
           <h3>Top ICU conditions</h3>
-          <div class="bar-list" id="conditionBars"></div>
+          <div class="bar-list" id="conditionBars" role="img" aria-label="Bar chart of top ICU conditions"></div>
         </div>
       </div>
     </section>
 
-    <section class="section reveal">
+    <section class="section reveal" aria-label="Outcome types">
       <div class="section-header">
         <h2>Outcome types</h2>
         <p>Primary vs secondary vs other outcome emphasis.</p>
       </div>
       <div class="panel wide">
-        <div class="bar-list" id="outcomeBars"></div>
+        <div class="bar-list" id="outcomeBars" role="img" aria-label="Bar chart of outcome types"></div>
       </div>
     </section>
 
-    <section class="section reveal">
+    <section class="section reveal" aria-label="Placebo signal">
       <div class="section-header">
         <h2>Placebo signal</h2>
         <p>How much of the hemodynamic signal comes from trials with placebo arms.</p>
       </div>
       <div class="panel wide">
-        <div class="ratio" id="placeboRatio">
+        <div class="ratio" id="placeboRatio" role="img" aria-label="Placebo signal ratio bar">
           <div class="ratio-bar" id="placeboRatioBar"></div>
         </div>
         <div class="ratio-labels">
@@ -151,7 +187,89 @@
       </div>
     </section>
 
-    <section class="section reveal">
+    <section class="section reveal" aria-label="PRISMA-S flow diagram">
+      <div class="section-header">
+        <h2>PRISMA-S flow</h2>
+        <p>Multi-source identification, screening, and inclusion.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div id="prismaFlowChart" role="img" aria-label="PRISMA-S flow diagram showing study identification, screening, and inclusion"></div>
+      </div>
+    </section>
+
+    <!-- NEW: Evidence Bubble Matrix (flagship) -->
+    <section class="section reveal" aria-label="Evidence bubble matrix">
+      <div class="section-header">
+        <h2>Evidence bubble matrix</h2>
+        <p>Intervention keywords vs outcome categories. Bubble size = study count, color = placebo proportion. Click to filter.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-bubbleMatrix"></div>
+        <div id="bubbleMatrixChart" class="plotly-chart" role="img" aria-label="Evidence bubble matrix showing intervention-outcome intersections"></div>
+      </div>
+    </section>
+
+    <!-- NEW: Interactive Forest Plot -->
+    <section class="section reveal" aria-label="Forest plot">
+      <div class="section-header">
+        <h2>Keyword evidence forest</h2>
+        <p>Study count and evidence strength per hemodynamic keyword. Click keywords to expand individual studies.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-forestPlot"></div>
+        <div id="forestPlotChart" class="plotly-chart" role="img" aria-label="Forest plot showing evidence per hemodynamic keyword"></div>
+      </div>
+    </section>
+
+    <section class="section reveal" aria-label="Interactive visualizations">
+      <div class="section-header">
+        <h2>Interactive visualizations</h2>
+        <p>Explore the evidence map through interactive charts. Hover for details, click to filter.</p>
+      </div>
+
+      <!-- NEW: Sankey + Radar -->
+      <div class="chart-grid">
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-sankey"></div>
+          <div id="sankeyChart" class="plotly-chart" role="img" aria-label="Sankey flow diagram of evidence pipeline"></div>
+        </div>
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-radar"></div>
+          <div id="radarChart" class="plotly-chart" role="img" aria-label="Radar chart comparing keyword evidence profiles"></div>
+        </div>
+      </div>
+
+      <div class="chart-grid" style="margin-top:16px">
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-treemap"></div>
+          <div id="treemapChart" class="plotly-chart" role="img" aria-label="Treemap of hemodynamic keywords by study count"></div>
+        </div>
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-sunburst"></div>
+          <div id="sunburstChart" class="plotly-chart" role="img" aria-label="Sunburst chart of outcome hierarchy"></div>
+        </div>
+      </div>
+      <div class="panel wide chart-container" style="margin-top:16px">
+        <div class="chart-toolbar" id="toolbar-heatmap"></div>
+        <div id="heatmapChart" class="plotly-chart" role="img" aria-label="Heatmap of keyword-condition cross-tabulation"></div>
+      </div>
+      <div class="chart-grid" style="margin-top:16px">
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-timeSeries"></div>
+          <div id="timeSeriesChart" class="plotly-chart" role="img" aria-label="Time series of trial registrations by year"></div>
+        </div>
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-network"></div>
+          <div id="networkChart" class="plotly-chart" role="img" aria-label="Force-directed keyword co-occurrence network"></div>
+        </div>
+      </div>
+      <div class="panel wide chart-container" style="margin-top:16px" id="choroplethSection">
+        <div class="chart-toolbar" id="toolbar-choropleth"></div>
+        <div id="choroplethChart" class="plotly-chart" role="img" aria-label="Geographic distribution of ICU trials"></div>
+      </div>
+    </section>
+
+    <section class="section reveal" aria-label="Data explorer">
       <div class="section-header">
         <h2>Explorer</h2>
         <p>Filter hemodynamic mentions by keyword, condition, outcome type, or placebo status.</p>
@@ -196,8 +314,8 @@
           <label>
             Direction
             <select id="sortDir">
-              <option value="asc">A → Z</option>
-              <option value="desc">Z → A</option>
+              <option value="asc">A &rarr; Z</option>
+              <option value="desc">Z &rarr; A</option>
             </select>
           </label>
           <label>
@@ -210,18 +328,20 @@
             </select>
           </label>
           <button class="export-btn" id="exportCsv" type="button">Download filtered CSV</button>
+          <button class="btn btn--ghost" id="exportJson" type="button">Export JSON</button>
+          <button class="btn btn--ghost" id="exportClipboard" type="button">Copy to clipboard</button>
         </div>
         <div class="table-wrap">
-          <table class="results-table" id="resultsTable">
+          <table class="results-table" id="resultsTable" role="grid" aria-label="Hemodynamic outcomes data table">
             <thead>
               <tr>
-                <th>NCT ID</th>
-                <th>Measure</th>
-                <th>Normalized</th>
-                <th>Keyword</th>
-                <th>Unit</th>
-                <th>Outcome</th>
-                <th>Placebo</th>
+                <th scope="col" aria-sort="none">NCT ID</th>
+                <th scope="col" aria-sort="none">Measure</th>
+                <th scope="col" aria-sort="none">Normalized</th>
+                <th scope="col" aria-sort="none">Keyword</th>
+                <th scope="col" aria-sort="none">Unit</th>
+                <th scope="col" aria-sort="none">Outcome</th>
+                <th scope="col" aria-sort="none">Placebo</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -269,7 +389,7 @@
       </div>
     </section>
 
-    <section class="section reveal" id="provenanceSection" style="display:none">
+    <section class="section reveal" id="provenanceSection" style="display:none" aria-label="Data provenance">
       <div class="section-header">
         <h2>Data provenance</h2>
         <p>External enrichment sources contributing evidence to each trial.</p>
@@ -279,7 +399,7 @@
       </div>
     </section>
 
-    <section class="section reveal">
+    <section class="section reveal" aria-label="Methods">
       <div class="section-header">
         <h2>Methods</h2>
         <p>Search strategy, classification, and known limitations.</p>
@@ -349,11 +469,12 @@
       </div>
     </section>
 
-    <footer class="footer">
+    <footer class="footer" role="contentinfo">
       <p>Built from ClinicalTrials.gov ICU RCT exports. Not prospectively registered.</p>
     </footer>
   </main>
 
+  <script src="plotly_charts.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
