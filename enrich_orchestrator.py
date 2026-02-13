@@ -141,6 +141,21 @@ class EnrichmentOrchestrator:
         self.db_path = db_path
         self.config = config
         self._adapters: Dict[str, Any] = {}
+        self._conn: Optional[sqlite3.Connection] = None
+
+    def _get_conn(self) -> sqlite3.Connection:
+        """Return a reusable SQLite connection (avoids open/close churn)."""
+        if self._conn is None:
+            self._conn = sqlite3.connect(str(self.db_path))
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA busy_timeout = 30000")
+        return self._conn
+
+    def close(self) -> None:
+        """Close the cached SQLite connection."""
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
 
     def _load_adapters(
         self, source_names: List[str], effective_config: Optional[Dict[str, Any]] = None,
@@ -254,25 +269,15 @@ class EnrichmentOrchestrator:
 
     def get_enrichment_summary(self, nct_id: str) -> Dict[str, Any]:
         """Get enrichment summary for a single trial (for dashboard)."""
-        conn = sqlite3.connect(str(self.db_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout = 30000")
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
-        try:
-            return self._enrichment_for_nct(conn, nct_id)
-        finally:
-            conn.close()
+        return self._enrichment_for_nct(conn, nct_id)
 
     def get_enrichment_summaries(self, nct_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         """Batch enrichment summaries — single DB connection for all NCT IDs."""
-        conn = sqlite3.connect(str(self.db_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout = 30000")
+        conn = self._get_conn()
         conn.row_factory = sqlite3.Row
-        try:
-            return {nct_id: self._enrichment_for_nct(conn, nct_id) for nct_id in nct_ids}
-        finally:
-            conn.close()
+        return {nct_id: self._enrichment_for_nct(conn, nct_id) for nct_id in nct_ids}
 
     @staticmethod
     def _enrichment_for_nct(conn: sqlite3.Connection, nct_id: str) -> Dict[str, Any]:
@@ -374,34 +379,24 @@ class EnrichmentOrchestrator:
 
     def _start_run(self, sources: List[str], nct_count: int) -> int:
         now = datetime.now(timezone.utc).isoformat()
-        conn = sqlite3.connect(str(self.db_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout = 30000")
-        try:
-            cursor = conn.execute(
-                """INSERT INTO enrichment_runs
-                   (started_utc, sources_requested, nct_count, status)
-                   VALUES (?, ?, ?, 'running')""",
-                (now, ",".join(sources), nct_count),
-            )
-            conn.commit()
-            return cursor.lastrowid
-        finally:
-            conn.close()
+        conn = self._get_conn()
+        cursor = conn.execute(
+            """INSERT INTO enrichment_runs
+               (started_utc, sources_requested, nct_count, status)
+               VALUES (?, ?, ?, 'running')""",
+            (now, ",".join(sources), nct_count),
+        )
+        conn.commit()
+        return cursor.lastrowid
 
     def _finish_run(self, run_id: int) -> None:
         now = datetime.now(timezone.utc).isoformat()
-        conn = sqlite3.connect(str(self.db_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout = 30000")
-        try:
-            conn.execute(
-                "UPDATE enrichment_runs SET finished_utc = ?, status = 'done' WHERE run_id = ?",
-                (now, run_id),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE enrichment_runs SET finished_utc = ?, status = 'done' WHERE run_id = ?",
+            (now, run_id),
+        )
+        conn.commit()
 
     @staticmethod
     def _print_source_stats(source_name: str, counts: Dict[str, int]) -> None:
@@ -468,16 +463,13 @@ def main() -> int:
     )
 
     if args.export_dashboard:
-        # Load all NCT IDs from DB
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("PRAGMA busy_timeout = 30000")
-        try:
-            rows = conn.execute("SELECT nct_id FROM trials").fetchall()
-            nct_ids = [r[0] for r in rows]
-        finally:
-            conn.close()
+        # Load all NCT IDs from DB using orchestrator's shared connection
+        conn = orchestrator._get_conn()
+        rows = conn.execute("SELECT nct_id FROM trials").fetchall()
+        nct_ids = [r[0] for r in rows]
         orchestrator.export_dashboard_enrichment(nct_ids, Path(args.export_dashboard))
 
+    orchestrator.close()
     return 0 if result.get("status") != "error" else 1
 
 

@@ -35,6 +35,7 @@ NON_HEMODYNAMIC_ADJUNCTS = frozenset([
     "ICU Severity Score",
     "Ventilation duration",
     "Resuscitation Endpoints",
+    "Vasopressor-free days",  # mortality composite, not a hemodynamic parameter
 ])
 
 CANONICAL_RULES = [
@@ -70,9 +71,9 @@ CANONICAL_RULES = [
     ),
     ("Lactate Clearance", ["lactate clearance"]),
     ("Lactate", ["lactate"]),
-    ("Oxygen Delivery", ["oxygen delivery", "do2"]),
+    ("Oxygen Delivery", ["oxygen delivery", "do2", "do2i"]),
     ("Oxygen Consumption", ["oxygen consumption", "vo2"]),
-    ("Ejection Fraction", ["ejection fraction", "ef"]),
+    ("Ejection Fraction", ["ejection fraction", "ef", "lvef", "rvef"]),
     ("Hemodynamics (general)", ["hemodynamic", "haemodynamic"]),
     (
         "Vasopressor/Inotrope",
@@ -104,9 +105,9 @@ CANONICAL_RULES = [
         "e/e' ratio", "lvot", "velocity time integral", "vti",
     ]),
     ("Volumetric Hemodynamics", [
-        "global end-diastolic volume", "gedv",
-        "intrathoracic blood volume", "itbv",
-        "extravascular lung water", "evlw",
+        "global end-diastolic volume", "gedv", "gedvi",
+        "intrathoracic blood volume", "itbv", "itbvi",
+        "extravascular lung water", "evlw", "evlwi",
     ]),
     ("Tissue Oxygenation", ["tissue oxygenation", "sto2", "nirs"]),
     ("dP/dt", ["dp/dt"]),
@@ -202,6 +203,12 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|adjusted\s+hr\b"
         r"|\bahr\b"
         r"|\bchr\b"
+        r"|\bcshr\b"                          # cause-specific hazard ratio
+        r"|\bshr\b"                            # sub-distribution hazard ratio
+        r"|\bcox\s+hr\b"                       # Cox HR
+        r"|sub-?distribution\s+hazard"         # subdistribution hazard ratio
+        r"|cause-specific\s+hazard"            # cause-specific hazard ratio
+        r"|proportional\s+hazards?\s+.*?\bhr\b"
         r"|\bhr\s*[=:]\s*\d+\.\d"         # HR=0.85 or HR=1.47 (hazard ratio pattern)
         r"|\bhr\s+\d+\.\d"                # HR 0.85 or HR 1.47
         r"|\bhr\s*\(\s*95\s*%"            # HR (95% CI
@@ -213,6 +220,20 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
     ),
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
     "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
+    "map": re.compile(
+        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen.activated\s+protein)",
+        re.IGNORECASE,
+    ),
+    "ef": re.compile(
+        r"(?:elongation\s+factor|enhancement\s+factor)",
+        re.IGNORECASE,
+    ),
+    "perfusion": re.compile(
+        r"(?:cerebral\s+perfusion(?!\s+pressure)"
+        r"|myocardial\s+perfusion"
+        r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
+        re.IGNORECASE,
+    ),
 }
 
 

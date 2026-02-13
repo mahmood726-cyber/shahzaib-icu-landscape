@@ -339,7 +339,7 @@ def search_pubmed_primary(
             "source_registry": "pubmed",
             "brief_title": _csv_safe(title),
             "official_title": "",
-            "overall_status": "PUBLISHED",
+            "overall_status": "COMPLETED",  # Published articles imply completed trials
             "study_type": "INTERVENTIONAL",
             "allocation": "RANDOMIZED",
             "primary_purpose": "",
@@ -372,7 +372,7 @@ def search_pubmed_primary(
         for kw in matches:
             hemo_mentions.append({
                 "nct_id": nct_id or f"PMID:{article['pmid']}",
-                "outcome_type": "published",
+                "outcome_type": "inferred",  # title/abstract keyword match, not a registered endpoint
                 "measure": _csv_safe(title[:200] if title else ""),
                 "keyword": kw,
                 "matched_text": _csv_safe(combined_text[:500]),

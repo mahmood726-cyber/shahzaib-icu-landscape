@@ -20,6 +20,8 @@
       "Geographic bias toward US-centric and industry-sponsored trials due to CT.gov registration patterns"
     ],
     "search_terms_added_v2": "ARDS, acute respiratory distress, respiratory failure, cardiogenic shock, hemorrhagic shock, haemorrhagic shock (UK spelling), ECMO, extracorporeal membrane oxygenation, multi-organ failure, organ dysfunction, CCU, MICU, SICU, PICU, NICU",
+    "known_gaps_v3": "TBI/traumatic brain injury, post-cardiac arrest, targeted temperature management, DKA, burns/major trauma, acute liver failure, hepatorenal syndrome, pulmonary embolism, status epilepticus — not yet in search query",
+    "negative_context_v3": "MAP (excludes MAP kinase/MAPK), EF (excludes elongation/enhancement factor), HR (excludes hazard ratio, sHR, csHR, Cox HR), SV (excludes SV40), PAP (excludes Pap smear), perfusion (excludes cerebral/myocardial perfusion imaging)",
     "grey_literature_note": "ClinicalTrials.gov and PubMed are searched. Trials registered exclusively on EUCTR, ISRCTN, ANZCTR, ChiCTR, or other registries without PubMed publications are not captured."
   },
   "hemodynamic_keywords": [
@@ -154,6 +156,7 @@
       "ACURASYS (NCT00299650) — cisatracurium in early severe ARDS",
       "EOLIA (NCT01470703) — ECMO in severe ARDS"
     ],
+    "version": "1.0",
     "verified_utc": "2026-02-08T13:55:00Z"
   }
 }

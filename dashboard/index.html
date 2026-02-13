@@ -34,7 +34,7 @@
     </div>
   </aside>
 
-  <main class="shell" id="main">
+  <main class="shell" id="main" tabindex="-1">
     <header class="hero reveal">
       <div class="hero-text">
         <p class="kicker">ICU RCT Living Evidence Gap Map</p>
@@ -59,8 +59,8 @@
         </div>
         <div class="meta-card">
           <p class="meta-label">Data</p>
-          <a class="meta-link" id="downloadCsv" href="data/icu_hemodynamic_living_map.csv">Download living map CSV</a>
-          <a class="meta-link" id="downloadSummary" href="data/icu_hemodynamic_summary.json">Download summary JSON</a>
+          <a class="meta-link" id="downloadCsv" href="data/icu_hemodynamic_living_map.csv" download="icu_hemodynamic_living_map.csv">Download living map CSV</a>
+          <a class="meta-link" id="downloadSummary" href="data/icu_hemodynamic_summary.json" download="icu_hemodynamic_summary.json">Download summary JSON</a>
         </div>
         <div class="meta-card">
           <p class="meta-label">Dataset</p>
@@ -337,16 +337,16 @@
           <button class="btn btn--ghost" id="exportClipboard" type="button">Copy to clipboard</button>
         </div>
         <div class="table-wrap">
-          <table class="results-table" id="resultsTable" role="grid" aria-label="Hemodynamic outcomes data table">
+          <table class="results-table" id="resultsTable" role="table" aria-label="Hemodynamic outcomes data table">
             <thead>
               <tr>
-                <th scope="col" aria-sort="none">NCT ID</th>
-                <th scope="col" aria-sort="none">Measure</th>
-                <th scope="col" aria-sort="none">Normalized</th>
-                <th scope="col" aria-sort="none">Keyword</th>
-                <th scope="col" aria-sort="none">Unit</th>
-                <th scope="col" aria-sort="none">Outcome</th>
-                <th scope="col" aria-sort="none">Placebo</th>
+                <th scope="col">NCT ID</th>
+                <th scope="col">Measure</th>
+                <th scope="col">Normalized</th>
+                <th scope="col">Keyword</th>
+                <th scope="col">Unit</th>
+                <th scope="col">Outcome</th>
+                <th scope="col">Placebo</th>
               </tr>
             </thead>
             <tbody></tbody>

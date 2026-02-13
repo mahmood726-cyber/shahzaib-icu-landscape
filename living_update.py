@@ -63,24 +63,39 @@ def _get_last_run_date() -> Optional[str]:
 
 
 def _append_log(entry: Dict[str, Any], max_entries: int = 200) -> None:
-    """Append a record to living_log.jsonl, rotating if it exceeds max_entries."""
-    LIVING_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with LIVING_LOG_PATH.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        fh.flush()
-        os.fsync(fh.fileno())
+    """Append a record to living_log.jsonl, rotating if it exceeds max_entries.
 
-    # Rotate: keep only the last max_entries lines
+    Uses read-append-write-back approach to avoid race between append and rotate.
+    """
+    LIVING_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    new_line = json.dumps(entry, ensure_ascii=False) + "\n"
+
     try:
-        lines = LIVING_LOG_PATH.read_text(encoding="utf-8").splitlines()
+        # Read existing lines, append new entry, rotate if needed — single pass
+        existing = ""
+        if LIVING_LOG_PATH.exists():
+            existing = LIVING_LOG_PATH.read_text(encoding="utf-8")
+        lines = [l for l in existing.splitlines() if l.strip()]
+        lines.append(new_line.rstrip("\n"))
+
+        rotated = False
         if len(lines) > max_entries:
-            keep = lines[-max_entries:]
-            tmp = LIVING_LOG_PATH.with_suffix(".jsonl.tmp")
-            tmp.write_text("\n".join(keep) + "\n", encoding="utf-8")
-            tmp.replace(LIVING_LOG_PATH)
-            print(f"  Log rotated: kept {len(keep)}/{len(lines)} entries", flush=True)
+            lines = lines[-max_entries:]
+            rotated = True
+
+        tmp = LIVING_LOG_PATH.with_suffix(".jsonl.tmp")
+        tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        tmp.replace(LIVING_LOG_PATH)
+
+        if rotated:
+            print(f"  Log rotated: kept {max_entries} entries", flush=True)
     except OSError:
-        pass  # Non-fatal — log rotation failure should not break the pipeline
+        # Fallback: just append (non-fatal)
+        try:
+            with LIVING_LOG_PATH.open("a", encoding="utf-8") as fh:
+                fh.write(new_line)
+        except OSError:
+            pass
 
 
 def _run_step(cmd: List[str], step_name: str, dry_run: bool = False) -> bool:
@@ -219,10 +234,9 @@ def _merge_incremental_csvs(
 
         # Determine fieldnames from backup (full schema) + any new columns
         if old_rows:
-            backup_fh = backup_path.open("r", encoding="utf-8-sig", newline="")
-            backup_reader = csv.DictReader(backup_fh)
-            fieldnames = backup_reader.fieldnames or fieldnames
-            backup_fh.close()
+            with backup_path.open("r", encoding="utf-8-sig", newline="") as bfh:
+                backup_reader = csv.DictReader(bfh)
+                fieldnames = backup_reader.fieldnames or fieldnames
 
         # Write merged result
         tmp = current_path.with_suffix(".csv.tmp")
@@ -242,14 +256,23 @@ def _merge_incremental_csvs(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="ICU Living Map — daily living update")
+    parser = argparse.ArgumentParser(
+        description="ICU Living Map — daily living update",
+        epilog="Examples:\n"
+               "  python living_update.py                          # Full living update\n"
+               "  python living_update.py --dry-run                # Preview without running\n"
+               "  python living_update.py --sources ctgov          # Only CT.gov source\n"
+               "  python living_update.py --force-full --skip-enrich  # Full refresh, skip enrich\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--dry-run", action="store_true", help="Show what would execute, don't run")
     parser.add_argument("--skip-enrich", action="store_true", help="Skip enrichment step")
-    parser.add_argument("--sources", default="ctgov,pubmed",
-                        help="Comma-separated sources to run (default: ctgov,pubmed)")
+    parser.add_argument("--sources", default="ctgov,pubmed", metavar="SRC",
+                        help="Comma-separated sources: ctgov,pubmed (default: ctgov,pubmed)")
     parser.add_argument("--force-full", action="store_true",
                         help="Ignore incremental date, full refresh")
-    parser.add_argument("--label", default="broad", help="Build label (default: broad)")
+    parser.add_argument("--label", default="broad", metavar="LABEL",
+                        help="Build label (default: broad)")
     args = parser.parse_args()
 
     python = _find_python()
@@ -389,7 +412,7 @@ def main() -> int:
         "sources_run": sources_run,
         "label": args.label,
         "incremental_since": last_date,
-        "errors": errors + warnings,
+        "errors": errors,
         "warnings": warnings,
         "dry_run": args.dry_run,
     }
@@ -403,7 +426,12 @@ def main() -> int:
     if errors or warnings:
         print(f"  Warnings: {errors + warnings}", file=sys.stderr)
 
-    return 0 if status != "failure" else 1
+    # 0=success, 1=failure, 2=partial failure (some sources failed but build succeeded)
+    if status == "failure":
+        return 1
+    elif status == "partial_failure":
+        return 2
+    return 0
 
 
 if __name__ == "__main__":

@@ -22,8 +22,11 @@
     .score-card .score-sub{font-size:.8rem;color:var(--clr-text-muted);margin-top:4px}
     .score-card .score-bar{position:absolute;bottom:0;left:0;height:4px;border-radius:0 2px 0 0;transition:width .8s ease}
     .score-green .score-value{color:#1a9850} .score-green .score-bar{background:#1a9850}
+    .score-green .score-value::after{content:" (Good)";font-size:.6rem;color:var(--clr-text-muted);font-weight:400}
     .score-amber .score-value{color:#e67e22} .score-amber .score-bar{background:#e67e22}
+    .score-amber .score-value::after{content:" (Fair)";font-size:.6rem;color:var(--clr-text-muted);font-weight:400}
     .score-red .score-value{color:#d73027} .score-red .score-bar{background:#d73027}
+    .score-red .score-value::after{content:" (Poor)";font-size:.6rem;color:var(--clr-text-muted);font-weight:400}
 
     .insight-box{background:var(--clr-surface-raised);border-left:4px solid var(--clr-accent);
       padding:14px 18px;border-radius:0 var(--radius-md) var(--radius-md) 0;margin-top:16px;font-size:.9rem}
@@ -70,7 +73,7 @@
   <div class="bg-orb orb-2" aria-hidden="true"></div>
   <div class="bg-grid" aria-hidden="true"></div>
 
-  <main class="shell" id="main">
+  <main class="shell" id="main" tabindex="-1">
     <header class="hero reveal">
       <div class="hero-text">
         <a href="index.html" class="back-link" aria-label="Back to main dashboard">&larr; Back to Dashboard</a>
@@ -153,10 +156,10 @@
         <h2>Temporal Evolution</h2>
         <p>How hemodynamic research has evolved over time, with ICU milestone annotations.</p>
       </div>
-      <div class="toggle-group" id="temporalToggles">
-        <button class="active" data-mode="absolute">Absolute</button>
-        <button data-mode="cumulative">Cumulative</button>
-        <button data-mode="proportion">Proportion</button>
+      <div class="toggle-group" id="temporalToggles" role="radiogroup" aria-label="Temporal chart mode">
+        <button class="active" data-mode="absolute" role="radio" aria-checked="true">Absolute</button>
+        <button data-mode="cumulative" role="radio" aria-checked="false">Cumulative</button>
+        <button data-mode="proportion" role="radio" aria-checked="false">Proportion</button>
       </div>
       <div class="panel wide chart-container">
         <div class="chart-toolbar" id="toolbar-temporal"></div>
@@ -177,7 +180,7 @@
       </div>
       <div class="panel wide" style="margin-top:16px;overflow-x:auto">
         <h3 style="margin:0 0 8px;font-size:1rem">Top Research Opportunities</h3>
-        <table class="priority-table" id="opportunityTable">
+        <table class="priority-table" id="opportunityTable" aria-label="Top research opportunities by placebo coverage gap">
           <thead><tr><th>Parameter</th><th>Total Studies</th><th>Placebo Studies</th><th>Placebo %</th><th>Tier</th></tr></thead>
           <tbody></tbody>
         </table>
@@ -235,7 +238,7 @@
         <div id="priorityChart" class="plotly-chart" role="img" aria-label="Horizontal bar chart of research priority scores"></div>
       </div>
       <div class="panel wide" style="margin-top:16px;overflow-x:auto">
-        <table class="priority-table" id="priorityTable">
+        <table class="priority-table" id="priorityTable" aria-label="Research priority rankings by composite score">
           <thead><tr>
             <th>Rank</th><th>Parameter</th><th>Composite</th>
             <th>Gap (30%)</th><th>Relevance (25%)</th><th>Recency (20%)</th>
@@ -245,6 +248,8 @@
         </table>
       </div>
     </section>
+
+    <div id="liveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
     <footer class="footer" role="contentinfo">
       <p>Hemodynamic Evidence Insights &mdash; built from ClinicalTrials.gov ICU RCT exports. Not prospectively registered.</p>
@@ -295,6 +300,17 @@ function safePlot(el, data, layout, config) {
   return Plotly.newPlot(el, data, layout, config);
 }
 
+const escapeHtml = (str) => {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+};
+
+const announce = (msg) => {
+  const el = document.getElementById("liveRegion");
+  if (el) { el.textContent = ""; requestAnimationFrame(() => { el.textContent = msg; }); }
+};
+
 function addExportToolbar(containerId) {
   const toolbar = document.getElementById("toolbar-" + containerId);
   if (!toolbar) return;
@@ -317,6 +333,10 @@ function addExportToolbar(containerId) {
 const animateCounter = (el, target, suffix, duration) => {
   suffix = suffix || "";
   duration = duration || 800;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.textContent = (target % 1 !== 0 ? target.toFixed(1) : target) + suffix;
+    return;
+  }
   const start = performance.now();
   const isFloat = target % 1 !== 0;
   const step = (now) => {
@@ -419,7 +439,9 @@ function renderScoreCards() {
   const secondary = (ot.find(o => o.outcome_type === "secondary") || {}).mention_count || 0;
   const balance = primary + secondary > 0 ? (1 - Math.abs(primary - secondary) / (primary + secondary)) * 100 : 0;
 
-  const totalStatuses = Object.values(s).reduce((a, b) => a + b, 0);
+  // Exclude non-CT.gov statuses (e.g. "PUBLISHED" from PubMed) from completion rate
+  const registryStatuses = Object.entries(s).filter(([k]) => k !== "PUBLISHED");
+  const totalStatuses = registryStatuses.reduce((a, [, b]) => a + b, 0);
   const completion = totalStatuses > 0 ? ((s.COMPLETED || 0) / totalStatuses) * 100 : 0;
 
   const scores = [
@@ -451,7 +473,7 @@ function renderScoreCards() {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function renderGapMatrix() {
-  const nk = [...summary.normalized_keywords].filter(k => k.study_count >= 10)
+  const nk = [...summary.normalized_keywords].filter(k => k.study_count >= 3)
     .map(k => ({ ...k, gap: 100 * (1 - k.placebo_study_count / k.study_count) }))
     .sort((a, b) => b.gap - a.gap);
 
@@ -491,7 +513,7 @@ function renderGapMatrix() {
   const top3 = nk.filter(k => k.study_count >= 50).slice(0, 3);
   const insightEl = document.getElementById("gapInsights");
   insightEl.innerHTML = '<p class="insight-title">Key Evidence Gaps</p><ul>' +
-    top3.map(k => "<li><strong>" + k.keyword + "</strong>: " + k.study_count +
+    top3.map(k => "<li><strong>" + escapeHtml(k.keyword) + "</strong>: " + k.study_count +
       " studies but only " + k.placebo_study_count + " with placebo (" +
       (100 - k.gap).toFixed(0) + "% coverage). Gap score: " + k.gap.toFixed(0) + "</li>").join("") +
     "</ul>";
@@ -534,10 +556,13 @@ function renderTemporal() {
 
   const milestones = [
     { year: 2001, label: "Rivers EGDT" },
+    { year: 2004, label: "SSC 1st" },
     { year: 2008, label: "SSC Update" },
     { year: 2014, label: "ProCESS/ARISE" },
     { year: 2016, label: "Sepsis-3" },
+    { year: 2017, label: "ADRENAL" },
     { year: 2020, label: "COVID-19" },
+    { year: 2021, label: "SSC 2021" },
   ];
 
   const traces = top8.map((kw, i) => {
@@ -598,9 +623,9 @@ function renderTemporal() {
   const fastest = growth[0];
   const declining = growth.filter(g => g.pct < 0);
   let html = '<p class="insight-title">5-Year Trends (' + (currentYear - 5) + '-' + currentYear + ' vs ' + (currentYear - 10) + '-' + (currentYear - 6) + ')</p><ul>';
-  html += "<li><strong>Fastest growing</strong>: " + fastest.kw + " (+" + fastest.pct.toFixed(0) + "% avg/year)</li>";
+  html += "<li><strong>Fastest growing</strong>: " + escapeHtml(fastest.kw) + " (+" + fastest.pct.toFixed(0) + "% avg/year)</li>";
   if (declining.length > 0) {
-    html += "<li><strong>Declining</strong>: " + declining.map(d => d.kw + " (" + d.pct.toFixed(0) + "%)").join(", ") + "</li>";
+    html += "<li><strong>Declining</strong>: " + declining.map(d => escapeHtml(d.kw) + " (" + d.pct.toFixed(0) + "%)").join(", ") + "</li>";
   }
   html += "<li>COVID-19 surge in 2020 drove a " +
     ((((yearMap[2020] ? Object.values(yearMap[2020]).reduce((s, v) => s + v, 0) : 0) /
@@ -659,7 +684,7 @@ function renderPlaceboLandscape() {
   tbody.innerHTML = opps.map(k => {
     const tierClass = k.placebo_study_count >= 100 ? "tier-strong" : k.placebo_study_count >= 20 ? "tier-moderate" : "tier-weak";
     const tierLabel = k.placebo_study_count >= 100 ? "Strong" : k.placebo_study_count >= 20 ? "Moderate" : "Weak";
-    return "<tr><td>" + k.keyword + "</td><td>" + k.study_count.toLocaleString() +
+    return "<tr><td>" + escapeHtml(k.keyword) + "</td><td>" + k.study_count.toLocaleString() +
       "</td><td>" + k.placebo_study_count.toLocaleString() + "</td><td>" + k.pct.toFixed(1) +
       '%</td><td><span class="tier-badge ' + tierClass + '">' + tierLabel + "</span></td></tr>";
   }).join("");
@@ -765,10 +790,10 @@ function renderDesignProfile() {
   const designScore = (doubleBlindPct * 0.4 + phase3PlusPct * 0.3 + completionPct * 0.3).toFixed(1);
 
   document.getElementById("designInsights").innerHTML =
-    '<p class="insight-title">Design Quality Score: ' + designScore + '/100</p><ul>' +
-    "<li>Double-blind or higher: " + doubleBlindPct.toFixed(1) + "% of studies</li>" +
-    "<li>Phase 3+: " + phase3PlusPct.toFixed(1) + "% of studies</li>" +
-    "<li>Completed: " + completionPct.toFixed(1) + "% of studies</li>" +
+    '<p class="insight-title">Design Quality Score: ' + designScore + '/100 <em style="font-weight:400;font-size:.8rem">(exploratory composite, not a validated instrument)</em></p><ul>' +
+    "<li>Double-blind or higher: " + doubleBlindPct.toFixed(1) + "% (weight 40%)</li>" +
+    "<li>Phase 3+: " + phase3PlusPct.toFixed(1) + "% (weight 30%)</li>" +
+    "<li>Completed: " + completionPct.toFixed(1) + "% (weight 30%)</li>" +
     "</ul>";
 }
 
@@ -850,13 +875,13 @@ function renderCooccurrence() {
 
   document.getElementById("cooccurInsights").innerHTML =
     '<p class="insight-title">Monitoring Bundles</p><ul>' +
-    top5.map(p => "<li><strong>" + p.keyword_a + " + " + p.keyword_b + "</strong>: " +
+    top5.map(p => "<li><strong>" + escapeHtml(p.keyword_a) + " + " + escapeHtml(p.keyword_b) + "</strong>: " +
       p.shared_study_count + " shared studies (Jaccard: " + p.jaccard.toFixed(2) + ")</li>").join("") +
     '</ul><p class="insight-title" style="margin-top:10px">Highest Co-measurement Affinity (Jaccard)</p><ul>' +
-    byJaccard.map(p => "<li>" + p.keyword_a + " + " + p.keyword_b + ": J=" + p.jaccard.toFixed(3) + "</li>").join("") +
+    byJaccard.map(p => "<li>" + escapeHtml(p.keyword_a) + " + " + escapeHtml(p.keyword_b) + ": J=" + p.jaccard.toFixed(3) + "</li>").join("") +
     "</ul>" +
     (isolated.length > 0 ? '<p class="insight-title" style="margin-top:10px">Isolated Parameters</p><p style="font-size:.85rem">' +
-      isolated.join(", ") + " &mdash; rarely co-measured with other parameters</p>" : "");
+      isolated.map(k => escapeHtml(k)).join(", ") + " &mdash; rarely co-measured with other parameters</p>" : "");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -925,7 +950,7 @@ function renderPriorityRankings() {
   // Full table
   const tbody = document.querySelector("#priorityTable tbody");
   tbody.innerHTML = ranked.map((r, i) =>
-    "<tr><td>" + (i + 1) + "</td><td><strong>" + r.keyword + "</strong></td>" +
+    "<tr><td>" + (i + 1) + "</td><td><strong>" + escapeHtml(r.keyword) + "</strong></td>" +
     "<td><strong>" + r.composite.toFixed(1) + "</strong></td>" +
     "<td>" + r.gap.toFixed(0) + "</td><td>" + r.relevance.toFixed(0) + "</td>" +
     "<td>" + r.recency.toFixed(0) + "</td><td>" + r.units.toFixed(0) + "</td>" +
@@ -966,10 +991,14 @@ async function init() {
   document.getElementById("temporalToggles").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-mode]");
     if (!btn) return;
-    document.querySelectorAll("#temporalToggles button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll("#temporalToggles button").forEach(b => {
+      b.classList.remove("active");
+      b.setAttribute("aria-checked", "false");
+    });
     btn.classList.add("active");
+    btn.setAttribute("aria-checked", "true");
     temporalMode = btn.dataset.mode;
-    if (summary) renderTemporal();
+    if (summary) { renderTemporal(); announce("Temporal chart updated to " + temporalMode + " view"); }
   });
 
   // Dataset selector
@@ -978,6 +1007,7 @@ async function init() {
     yearKeywordData = null;
     await loadDataset(sel.value);
     renderAll();
+    announce("Charts updated for " + sel.options[sel.selectedIndex].text + " dataset");
   });
 
   // Initial load

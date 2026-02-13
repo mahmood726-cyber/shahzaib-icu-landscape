@@ -343,7 +343,7 @@ def validate_enrichment_coverage(summary: Dict[str, Any]) -> ValidationResult:
     if total_hemo == 0:
         return ValidationResult("P1-enrichment-coverage", "P1", True,
                                 "No hemo trials to check")
-    ratio = enriched / total_hemo
+    ratio = min(enriched / total_hemo, 1.0)  # Cap at 100% (enriched may include non-hemo trials)
     passed = ratio >= 0.30
     return ValidationResult(
         "P1-enrichment-coverage", "P1", passed,
@@ -594,6 +594,36 @@ def validate_registry_diversity(summary: Dict[str, Any]) -> ValidationResult:
         f"{count} distinct registries represented ({total_trials} total trials)")
 
 
+def validate_enrollment_plausibility(studies_csv: Path) -> ValidationResult:
+    """P1-enrollment-plausibility: Flag studies with implausible enrollment counts."""
+    if not studies_csv.exists():
+        return ValidationResult("P1-enrollment-plausibility", "P1", True, "no studies CSV")
+    flagged = []
+    try:
+        with studies_csv.open("r", encoding="utf-8-sig", newline="") as fh:
+            for row in csv.DictReader(fh):
+                enr = row.get("enrollment_count", "")
+                if not enr:
+                    continue
+                try:
+                    n = int(enr)
+                except (ValueError, TypeError):
+                    continue
+                etype = (row.get("enrollment_type") or "").upper()
+                nct = row.get("nct_id", "?")
+                if n > 50000:
+                    flagged.append(f"{nct}: enrollment={n} (>50K)")
+                elif n == 0 and etype == "ACTUAL":
+                    flagged.append(f"{nct}: enrollment=0 (ACTUAL)")
+    except OSError:
+        return ValidationResult("P1-enrollment-plausibility", "P1", True, "could not read CSV")
+    if flagged:
+        return ValidationResult(
+            "P1-enrollment-plausibility", "P1", False,
+            f"{len(flagged)} implausible enrollment(s): {'; '.join(flagged[:5])}")
+    return ValidationResult("P1-enrollment-plausibility", "P1", True, "all enrollments plausible")
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────
 
 def run_validators(
@@ -631,6 +661,8 @@ def run_validators(
         # P2 — Search strategy
         validate_search_quality(summary),
         validate_recall_reference_standard(summary, studies_csv),
+        # P1 — Enrollment plausibility
+        validate_enrollment_plausibility(studies_csv),
         # Multi-source validators
         validate_multi_source_coverage(summary),
         validate_dedup_integrity(output_csv),

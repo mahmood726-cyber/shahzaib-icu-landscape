@@ -45,7 +45,8 @@ PLACEBO_TOKENS = (
 COMPARATOR_RULES = [
     ("placebo", ["placebo"]),
     ("sham", ["sham"]),
-    ("usual_care", ["usual care", "standard care", "routine care", "best supportive care"]),
+    ("usual_care", ["usual care", "standard care", "standard of care", "routine care",
+                    "best supportive care", "guideline-based care"]),
     ("no_intervention", ["no intervention", "no treatment"]),
     ("active_control", ["active control", "active comparator"]),
     ("control", ["control arm", "control group", "comparator arm", "comparator group"]),
@@ -108,6 +109,12 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|adjusted\s+hr\b"
         r"|\bahr\b"
         r"|\bchr\b"
+        r"|\bcshr\b"                          # cause-specific hazard ratio
+        r"|\bshr\b"                            # sub-distribution hazard ratio
+        r"|\bcox\s+hr\b"                       # Cox HR
+        r"|sub-?distribution\s+hazard"         # subdistribution hazard ratio
+        r"|cause-specific\s+hazard"            # cause-specific hazard ratio
+        r"|proportional\s+hazards?\s+.*?\bhr\b"
         r"|\bhr\s*[=:]\s*\d+\.\d"
         r"|\bhr\s+\d+\.\d"
         r"|\bhr\s*\(\s*95\s*%"
@@ -119,6 +126,20 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
     ),
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
     "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
+    "map": re.compile(
+        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen.activated\s+protein)",
+        re.IGNORECASE,
+    ),
+    "ef": re.compile(
+        r"(?:elongation\s+factor|enhancement\s+factor)",
+        re.IGNORECASE,
+    ),
+    "perfusion": re.compile(
+        r"(?:cerebral\s+perfusion(?!\s+pressure)"
+        r"|myocardial\s+perfusion"
+        r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
+        re.IGNORECASE,
+    ),
 }
 
 

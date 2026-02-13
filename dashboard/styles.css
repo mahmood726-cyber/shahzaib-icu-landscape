@@ -598,6 +598,11 @@ body {
   line-height: 1;
   opacity: 0.7;
   transition: opacity var(--transition-fast);
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chip button:hover {
@@ -930,6 +935,11 @@ body {
   background: var(--clr-surface);
 }
 
+.sidebar-close:focus-visible {
+  outline: 2px solid var(--clr-accent);
+  outline-offset: 2px;
+}
+
 .sidebar-section {
   margin-top: var(--space-lg);
   padding-top: var(--space-md);
@@ -1148,7 +1158,8 @@ body {
   z-index: 10;
 }
 
-.chart-container:hover .chart-toolbar {
+.chart-container:hover .chart-toolbar,
+.chart-container:focus-within .chart-toolbar {
   opacity: 1;
 }
 

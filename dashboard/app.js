@@ -281,6 +281,9 @@ const renderBars = (container, items, labelKey, valueKey, maxItems) => {
     const row = document.createElement("div");
     row.className = "bar-row";
     row.style.cursor = "pointer";
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.setAttribute("aria-label", `${item[labelKey]}: ${formatNumber(item[valueKey])}`);
 
     const label = document.createElement("div");
     label.textContent = item[labelKey];
@@ -301,11 +304,15 @@ const renderBars = (container, items, labelKey, valueKey, maxItems) => {
     row.appendChild(track);
     row.appendChild(value);
 
-    // Cross-filter on click
-    row.addEventListener("click", () => {
+    // Cross-filter on click or keyboard activation (P0-A11Y-2)
+    const activateFilter = () => {
       if (labelKey === "keyword") FilterState.set("keyword", item[labelKey]);
       else if (labelKey === "condition") FilterState.set("condition", item[labelKey]);
       else if (labelKey === "outcome_type") FilterState.set("outcome", item[labelKey]);
+    };
+    row.addEventListener("click", activateFilter);
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activateFilter(); }
     });
 
     container.appendChild(row);
@@ -796,15 +803,45 @@ const openSidebar = (nctId) => {
   sidebar.setAttribute("aria-hidden", "false");
   if (backdrop) { backdrop.classList.add("is-visible"); backdrop.setAttribute("aria-hidden", "false"); }
 
+  // Focus management: move focus into sidebar and trap Tab (P0-A11Y-1)
+  _sidebarTrigger = document.activeElement;
+  const closeBtn = document.getElementById("sidebarClose");
+  if (closeBtn) requestAnimationFrame(() => closeBtn.focus());
+
   // Announce to screen reader
   announce(`Study details opened for ${detail.nct_id}`);
 };
+
+let _sidebarTrigger = null;
+
+const _trapFocusInSidebar = (e) => {
+  if (e.key !== "Tab") return;
+  const sidebar = document.getElementById("studySidebar");
+  if (!sidebar || !sidebar.classList.contains("is-open")) return;
+  const focusable = sidebar.querySelectorAll('a[href], button, [tabindex]:not([tabindex="-1"])');
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+};
+document.addEventListener("keydown", _trapFocusInSidebar);
 
 const closeSidebar = () => {
   const sidebar = document.getElementById("studySidebar");
   const backdrop = document.getElementById("sidebarBackdrop");
   if (sidebar) { sidebar.classList.remove("is-open"); sidebar.setAttribute("aria-hidden", "true"); }
   if (backdrop) { backdrop.classList.remove("is-visible"); backdrop.setAttribute("aria-hidden", "true"); }
+  // Restore focus to triggering element (P0-A11Y-1)
+  if (_sidebarTrigger && _sidebarTrigger.focus) {
+    _sidebarTrigger.focus();
+    _sidebarTrigger = null;
+  }
   selectedNctId = null;
 };
 
@@ -1039,6 +1076,7 @@ const createTableRow = (row) => {
   const tr = document.createElement("tr");
   tr.dataset.nctId = row.nct_id;
   tr.style.height = `${ROW_HEIGHT}px`;
+  tr.setAttribute("tabindex", "-1");
   if (row.nct_id === selectedNctId) tr.classList.add("is-selected");
 
   const cells = [
@@ -1057,15 +1095,18 @@ const createTableRow = (row) => {
     tr.appendChild(td);
   });
 
-  tr.addEventListener("click", () => {
+  const activateRow = () => {
     selectedNctId = row.nct_id;
     openSidebar(row.nct_id);
-    // Also update old detail panel
     renderDetail(row.nct_id);
-    // Highlight
     const prev = document.querySelector("#resultsTable tbody tr.is-selected");
     if (prev) prev.classList.remove("is-selected");
     tr.classList.add("is-selected");
+  };
+
+  tr.addEventListener("click", activateRow);
+  tr.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activateRow(); }
   });
 
   return tr;
@@ -1253,7 +1294,9 @@ const copyTableToClipboard = () => {
   rows.forEach((row) => {
     lines.push(headers.map((k) => (row[k] || "").replace(/\t/g, " ")).join("\t"));
   });
-  navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
+  navigator.clipboard.writeText(lines.join("\n"))
+    .then(() => announce("Data copied to clipboard."))
+    .catch(() => announce("Failed to copy to clipboard."));
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1785,6 +1828,9 @@ const showTourStep = () => {
     tooltip.style.left = `${Math.max(16, Math.min(rect.left, window.innerWidth - 380))}px`;
 
     document.body.appendChild(tooltip);
+
+    // Focus management: move focus to tooltip and trap within (P0-A11Y-4)
+    requestAnimationFrame(() => nextBtn.focus());
   }, 400);
 };
 
