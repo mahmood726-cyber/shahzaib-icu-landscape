@@ -20,14 +20,16 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
+import shutil
 import subprocess
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 ROOT = Path(__file__).resolve().parent
 LIVING_LOG_PATH = ROOT / "living_log.jsonl"
@@ -114,6 +116,119 @@ def _find_python() -> str:
     return sys.executable
 
 
+def _backup_csv(path: Path) -> Optional[Path]:
+    """Back up a CSV file before incremental fetch. Returns backup path or None."""
+    if not path.exists():
+        return None
+    backup = path.with_suffix(".csv.pre_incremental")
+    shutil.copy2(str(path), str(backup))
+    return backup
+
+
+def _merge_incremental_csvs(
+    query_name: str,
+    output_dir: Path,
+    backups: Dict[str, Path],
+) -> None:
+    """Merge incremental fetch results into the backed-up full CSV files.
+
+    For each CSV type:
+    - Read the full (backup) dataset
+    - Read the incremental (newly fetched) dataset
+    - For studies: update/add rows by nct_id
+    - For hemo/arms/outcomes: replace ALL rows for updated nct_ids with new data
+    """
+    csv_types = {
+        "studies": f"{query_name}_studies.csv",
+        "hemo": f"{query_name}_hemodynamic_mentions.csv",
+        "arms": f"{query_name}_arms.csv",
+        "outcomes": f"{query_name}_outcomes.csv",
+    }
+
+    # Read incremental studies to get the set of updated nct_ids
+    incremental_studies_path = output_dir / csv_types["studies"]
+    updated_nct_ids: Set[str] = set()
+    if incremental_studies_path.exists():
+        with incremental_studies_path.open("r", encoding="utf-8-sig", newline="") as fh:
+            for row in csv.DictReader(fh):
+                nct_id = (row.get("nct_id") or "").strip()
+                if nct_id:
+                    updated_nct_ids.add(nct_id)
+
+    if not updated_nct_ids:
+        # No incremental updates — restore backups
+        for label, backup_path in backups.items():
+            if backup_path and backup_path.exists():
+                filename = csv_types.get(label)
+                if filename:
+                    target = output_dir / filename
+                    shutil.copy2(str(backup_path), str(target))
+        print(f"  Merge: no incremental updates, restored backups", flush=True)
+        return
+
+    for label, filename in csv_types.items():
+        backup_path = backups.get(label)
+        current_path = output_dir / filename
+
+        if not backup_path or not backup_path.exists():
+            # No backup — the incremental file is all we have
+            continue
+
+        if not current_path.exists():
+            # Fetch didn't produce this file — restore backup
+            shutil.copy2(str(backup_path), str(current_path))
+            continue
+
+        # Read backup (full dataset) rows
+        old_rows: List[Dict[str, str]] = []
+        with backup_path.open("r", encoding="utf-8-sig", newline="") as fh:
+            old_rows = list(csv.DictReader(fh))
+
+        # Read incremental (new) rows
+        new_rows: List[Dict[str, str]] = []
+        with current_path.open("r", encoding="utf-8-sig", newline="") as fh:
+            reader = csv.DictReader(fh)
+            fieldnames = reader.fieldnames or []
+            new_rows = list(reader)
+
+        if label == "studies":
+            # Merge by nct_id: new rows override old, keep non-updated old rows
+            old_by_id = {(r.get("nct_id") or "").strip(): r for r in old_rows}
+            for row in new_rows:
+                nct_id = (row.get("nct_id") or "").strip()
+                if nct_id:
+                    old_by_id[nct_id] = row
+            merged = list(old_by_id.values())
+        else:
+            # For hemo/arms/outcomes: keep old rows for non-updated nct_ids,
+            # replace with new rows for updated nct_ids
+            kept = [r for r in old_rows if (r.get("nct_id") or "").strip() not in updated_nct_ids]
+            merged = kept + new_rows
+
+        # Determine fieldnames from backup (full schema) + any new columns
+        if old_rows:
+            backup_fh = backup_path.open("r", encoding="utf-8-sig", newline="")
+            backup_reader = csv.DictReader(backup_fh)
+            fieldnames = backup_reader.fieldnames or fieldnames
+            backup_fh.close()
+
+        # Write merged result
+        tmp = current_path.with_suffix(".csv.tmp")
+        with tmp.open("w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            for row in merged:
+                writer.writerow(row)
+        tmp.replace(current_path)
+
+    # Clean up backups
+    for backup_path in backups.values():
+        if backup_path and backup_path.exists():
+            backup_path.unlink()
+
+    print(f"  Merge: {len(updated_nct_ids)} updated NCT IDs merged into full dataset", flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="ICU Living Map — daily living update")
     parser.add_argument("--dry-run", action="store_true", help="Show what would execute, don't run")
@@ -145,13 +260,47 @@ def main() -> int:
 
     # Step 1: Fetch CT.gov
     if "ctgov" in sources:
+        is_incremental = bool(last_date and not args.force_full)
+        # Back up existing CSVs before incremental fetch (to merge later)
+        ctgov_backups: Dict[str, Path] = {}
+        if is_incremental and not args.dry_run:
+            query_name = "icu_rct_broad"
+            for label, suffix in [("studies", "_studies.csv"), ("hemo", "_hemodynamic_mentions.csv"),
+                                  ("arms", "_arms.csv"), ("outcomes", "_outcomes.csv")]:
+                path = OUTPUT_DIR / f"{query_name}{suffix}"
+                backup = _backup_csv(path)
+                if backup:
+                    ctgov_backups[label] = backup
+
         cmd = [python, "fetch_ctgov_icu_placebo.py"]
-        if last_date and not args.force_full:
+        if is_incremental:
             cmd.extend(["--updated-since", last_date])
         if _run_step(cmd, "Fetch CT.gov", dry_run=args.dry_run):
             sources_run.append("ctgov")
+            # Merge incremental results into full dataset
+            if is_incremental and ctgov_backups and not args.dry_run:
+                try:
+                    _merge_incremental_csvs("icu_rct_broad", OUTPUT_DIR, ctgov_backups)
+                except Exception as exc:
+                    print(f"  WARNING: merge failed, restoring backups: {exc}", file=sys.stderr)
+                    # Restore backups on merge failure
+                    for label, backup_path in ctgov_backups.items():
+                        if backup_path and backup_path.exists():
+                            suffix_map = {"studies": "_studies.csv", "hemo": "_hemodynamic_mentions.csv",
+                                         "arms": "_arms.csv", "outcomes": "_outcomes.csv"}
+                            target = OUTPUT_DIR / f"icu_rct_broad{suffix_map[label]}"
+                            shutil.copy2(str(backup_path), str(target))
+                            backup_path.unlink()
+                    warnings.append(f"incremental merge failed: {exc}")
         else:
             errors.append("ctgov fetch failed")
+            # Restore backups on fetch failure
+            for backup_path in ctgov_backups.values():
+                if backup_path and backup_path.exists():
+                    target_name = backup_path.name.replace(".pre_incremental", "")
+                    target = backup_path.parent / target_name
+                    shutil.copy2(str(backup_path), str(target))
+                    backup_path.unlink()
 
     # Step 2: Search PubMed primary
     if "pubmed" in sources:
