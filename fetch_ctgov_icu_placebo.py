@@ -114,7 +114,7 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|\bcox\s+hr\b"                       # Cox HR
         r"|sub-?distribution\s+hazard"         # subdistribution hazard ratio
         r"|cause-specific\s+hazard"            # cause-specific hazard ratio
-        r"|proportional\s+hazards?\s+.*?\bhr\b"
+        r"|proportional\s+hazards?\s+.{0,80}\bhr\b"
         r"|\bhr\s*[=:]\s*\d+\.\d"
         r"|\bhr\s+\d+\.\d"
         r"|\bhr\s*\(\s*95\s*%"
@@ -127,7 +127,7 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
     "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
     "map": re.compile(
-        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen.activated\s+protein)",
+        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen[-\s]activated\s+protein)",
         re.IGNORECASE,
     ),
     "ef": re.compile(

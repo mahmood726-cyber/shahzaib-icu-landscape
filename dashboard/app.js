@@ -474,6 +474,10 @@ const initDarkMode = () => {
 // ══════════════════════════════════════════════════════════════════════════════
 const animateCounter = (el, target, duration = 800) => {
   if (!el || target == null) return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.textContent = target.toLocaleString("en-US");
+    return;
+  }
   const start = performance.now();
   const startVal = parseInt(el.textContent.replace(/[^0-9]/g, ""), 10) || 0;
   if (startVal === target) return;

@@ -46,7 +46,7 @@
     @media(max-width:768px){.chart-2x2{grid-template-columns:1fr}}
 
     .toggle-group{display:flex;gap:4px;margin-bottom:10px}
-    .toggle-group button{padding:4px 12px;border:1px solid var(--clr-border-light);border-radius:var(--radius-pill);
+    .toggle-group button{padding:8px 14px;min-height:44px;border:1px solid var(--clr-border-light);border-radius:var(--radius-pill);
       background:var(--clr-surface);color:var(--clr-ink);font-size:.8rem;cursor:pointer;transition:all .2s}
     .toggle-group button.active{background:var(--clr-accent);color:#fff;border-color:var(--clr-accent)}
 
@@ -181,7 +181,7 @@
       <div class="panel wide" style="margin-top:16px;overflow-x:auto">
         <h3 style="margin:0 0 8px;font-size:1rem">Top Research Opportunities</h3>
         <table class="priority-table" id="opportunityTable" aria-label="Top research opportunities by placebo coverage gap">
-          <thead><tr><th>Parameter</th><th>Total Studies</th><th>Placebo Studies</th><th>Placebo %</th><th>Tier</th></tr></thead>
+          <thead><tr><th scope="col">Parameter</th><th scope="col">Total Studies</th><th scope="col">Placebo Studies</th><th scope="col">Placebo %</th><th scope="col">Tier</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -240,9 +240,9 @@
       <div class="panel wide" style="margin-top:16px;overflow-x:auto">
         <table class="priority-table" id="priorityTable" aria-label="Research priority rankings by composite score">
           <thead><tr>
-            <th>Rank</th><th>Parameter</th><th>Composite</th>
-            <th>Gap (30%)</th><th>Relevance (25%)</th><th>Recency (20%)</th>
-            <th>Units (15%)</th><th>Primacy (10%)</th>
+            <th scope="col">Rank</th><th scope="col">Parameter</th><th scope="col">Composite</th>
+            <th scope="col">Gap (30%)</th><th scope="col">Relevance (25%)</th><th scope="col">Recency (20%)</th>
+            <th scope="col">Units (15%)</th><th scope="col">Primacy (10%)</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -439,7 +439,7 @@ function renderScoreCards() {
   const secondary = (ot.find(o => o.outcome_type === "secondary") || {}).mention_count || 0;
   const balance = primary + secondary > 0 ? (1 - Math.abs(primary - secondary) / (primary + secondary)) * 100 : 0;
 
-  // Exclude non-CT.gov statuses (e.g. "PUBLISHED" from PubMed) from completion rate
+  // Exclude non-CT.gov statuses from completion rate (legacy data may contain "PUBLISHED"; pipeline now emits "COMPLETED")
   const registryStatuses = Object.entries(s).filter(([k]) => k !== "PUBLISHED");
   const totalStatuses = registryStatuses.reduce((a, [, b]) => a + b, 0);
   const completion = totalStatuses > 0 ? ((s.COMPLETED || 0) / totalStatuses) * 100 : 0;
@@ -473,7 +473,8 @@ function renderScoreCards() {
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function renderGapMatrix() {
-  const nk = [...summary.normalized_keywords].filter(k => k.study_count >= 3)
+  const GAP_MIN_STUDIES = 3; // Minimum studies to include in gap matrix (avoids volatile percentages)
+  const nk = [...summary.normalized_keywords].filter(k => k.study_count >= GAP_MIN_STUDIES)
     .map(k => ({ ...k, gap: 100 * (1 - k.placebo_study_count / k.study_count) }))
     .sort((a, b) => b.gap - a.gap);
 
@@ -560,7 +561,7 @@ function renderTemporal() {
     { year: 2008, label: "SSC Update" },
     { year: 2014, label: "ProCESS/ARISE" },
     { year: 2016, label: "Sepsis-3" },
-    { year: 2017, label: "ADRENAL" },
+    { year: 2018, label: "ADRENAL" },
     { year: 2020, label: "COVID-19" },
     { year: 2021, label: "SSC 2021" },
   ];
@@ -908,6 +909,8 @@ function renderPriorityRankings() {
     if (ym && parseInt(ym[1], 10) >= 2020) kwStats[kw].recent++;
 
     if (row.normalized_unit && row.normalized_unit !== "" && row.normalized_unit !== "N/A") kwStats[kw].withUnit++;
+    // Note: "inferred" outcome_type (PubMed title/abstract matches) has no primary/secondary
+    // classification, so it correctly contributes 0 to primacy scoring
     if (row.outcome_type === "primary") kwStats[kw].primary++;
   });
 
@@ -988,17 +991,37 @@ async function init() {
   initDarkMode();
 
   // Temporal mode toggles
-  document.getElementById("temporalToggles").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-mode]");
+  const toggleGroup = document.getElementById("temporalToggles");
+  function activateToggle(btn) {
     if (!btn) return;
-    document.querySelectorAll("#temporalToggles button").forEach(b => {
+    toggleGroup.querySelectorAll("button").forEach(b => {
       b.classList.remove("active");
       b.setAttribute("aria-checked", "false");
+      b.setAttribute("tabindex", "-1");
     });
     btn.classList.add("active");
     btn.setAttribute("aria-checked", "true");
+    btn.setAttribute("tabindex", "0");
+    btn.focus();
     temporalMode = btn.dataset.mode;
     if (summary) { renderTemporal(); announce("Temporal chart updated to " + temporalMode + " view"); }
+  }
+  // Set initial tabindex: only active button is tabbable
+  toggleGroup.querySelectorAll("button").forEach(b => {
+    b.setAttribute("tabindex", b.classList.contains("active") ? "0" : "-1");
+  });
+  toggleGroup.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-mode]");
+    if (btn) activateToggle(btn);
+  });
+  toggleGroup.addEventListener("keydown", (e) => {
+    const btns = [...toggleGroup.querySelectorAll("button")];
+    const idx = btns.indexOf(e.target);
+    if (idx < 0) return;
+    let next = -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % btns.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + btns.length) % btns.length;
+    if (next >= 0) { e.preventDefault(); activateToggle(btns[next]); }
   });
 
   // Dataset selector

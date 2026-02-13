@@ -57,17 +57,45 @@ def load_config() -> Dict[str, Any]:
         return json.load(fh)
 
 
-# Negative-context patterns (shared)
+# Negative-context patterns (shared with fetch_ctgov_icu_placebo.py & build_living_map.py)
 _ABBREVIATION_NEGATIVE_CONTEXT = {
     "hr": re.compile(
-        r"(?:hazard\s+ratio|adjusted\s+hr\b|\bahr\b|\bchr\b"
-        r"|\bhr\s*[=:]\s*\d+\.\d|\bhr\s+\d+\.\d"
-        r"|\bhr\s*\(\s*95\s*%|\bhr\s*\[\s*95\s*%"
-        r"|\bhr\s*;?\s*95\s*%\s*ci|\bhr\s+\d\.\d+\s*[,;(])",
+        r"(?:"
+        r"hazard\s+ratio"
+        r"|adjusted\s+hr\b"
+        r"|\bahr\b"
+        r"|\bchr\b"
+        r"|\bcshr\b"
+        r"|\bshr\b"
+        r"|\bcox\s+hr\b"
+        r"|sub-?distribution\s+hazard"
+        r"|cause-specific\s+hazard"
+        r"|proportional\s+hazards?\s+.{0,80}\bhr\b"
+        r"|\bhr\s*[=:]\s*\d+\.\d"
+        r"|\bhr\s+\d+\.\d"
+        r"|\bhr\s*\(\s*95\s*%"
+        r"|\bhr\s*\[\s*95\s*%"
+        r"|\bhr\s*;?\s*95\s*%\s*ci"
+        r"|\bhr\s+\d\.\d+\s*[,;(]"
+        r")",
         re.IGNORECASE,
     ),
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
     "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
+    "map": re.compile(
+        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen[-\s]activated\s+protein)",
+        re.IGNORECASE,
+    ),
+    "ef": re.compile(
+        r"(?:elongation\s+factor|enhancement\s+factor)",
+        re.IGNORECASE,
+    ),
+    "perfusion": re.compile(
+        r"(?:cerebral\s+perfusion(?!\s+pressure)"
+        r"|myocardial\s+perfusion"
+        r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
+        re.IGNORECASE,
+    ),
 }
 
 

@@ -365,7 +365,7 @@ const PlotlyCharts = (() => {
 
     el.innerHTML = `
       <svg viewBox="0 0 720 440" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:720px;margin:0 auto;display:block" role="img" aria-label="PRISMA-S flow diagram">
-        <desc>PRISMA-S flow diagram showing ${fmtN(p.ctgov_retrieved)} CT.gov records and ${fmtN(p.pubmed_retrieved || 0)} PubMed records identified, ${fmtN(p.total_after_dedup)} after deduplication, ${fmtN(p.with_hemodynamic_outcomes)} with hemodynamic outcomes, ${fmtN(p.with_hemo_and_placebo)} with both hemodynamic outcomes and placebo arms included.</desc>
+        <desc>PRISMA-S flow diagram showing ${formatNumber(ctgov)} CT.gov records and ${formatNumber(pubmed)} PubMed records identified, ${formatNumber(afterDedup)} after deduplication, ${formatNumber(withHemo)} with hemodynamic outcomes, ${formatNumber(hemoPlacebo)} with both hemodynamic outcomes and placebo arms included.</desc>
         <defs>
           <marker id="prisma-arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill="${COLORS.accent2}" />

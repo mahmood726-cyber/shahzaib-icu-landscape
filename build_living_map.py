@@ -208,7 +208,7 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|\bcox\s+hr\b"                       # Cox HR
         r"|sub-?distribution\s+hazard"         # subdistribution hazard ratio
         r"|cause-specific\s+hazard"            # cause-specific hazard ratio
-        r"|proportional\s+hazards?\s+.*?\bhr\b"
+        r"|proportional\s+hazards?\s+.{0,80}\bhr\b"
         r"|\bhr\s*[=:]\s*\d+\.\d"         # HR=0.85 or HR=1.47 (hazard ratio pattern)
         r"|\bhr\s+\d+\.\d"                # HR 0.85 or HR 1.47
         r"|\bhr\s*\(\s*95\s*%"            # HR (95% CI
@@ -221,7 +221,7 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
     "sv": re.compile(r"\bsv40\b", re.IGNORECASE),
     "pap": re.compile(r"\bpap\s+(?:smear|test)\b", re.IGNORECASE),
     "map": re.compile(
-        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen.activated\s+protein)",
+        r"(?:map\s*(?:kinase|pathway)|mapk|\bmitogen[-\s]activated\s+protein)",
         re.IGNORECASE,
     ),
     "ef": re.compile(
@@ -928,7 +928,7 @@ def build_living_map(
             "total_hemo_mentions": total_mentions,
             "core_hemo_mentions": total_mentions - adjunct_mentions,
             "adjunct_mentions": adjunct_mentions,
-            "adjunct_note": "ICU Severity Score, Ventilation duration, and Resuscitation Endpoints are non-hemodynamic adjuncts reported separately",
+            "adjunct_note": "ICU Severity Score, Ventilation duration, Resuscitation Endpoints, and Vasopressor-free days are non-hemodynamic adjuncts reported separately",
             "placebo_hemo_mentions": placebo_mentions,
             "non_placebo_hemo_mentions": total_mentions - placebo_mentions,
             "orphan_hemo_nct_ids": len(orphan_nct_ids),

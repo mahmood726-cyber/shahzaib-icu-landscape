@@ -991,6 +991,7 @@ body {
   align-items: center;
   gap: 12px;
   font-size: 0.9rem;
+  min-height: 44px;
 }
 
 .bar-row > div:first-child {
@@ -1164,8 +1165,8 @@ body {
 }
 
 .chart-toolbar button {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: none;
   border-radius: var(--radius-sm);
   background: var(--clr-surface-solid);
