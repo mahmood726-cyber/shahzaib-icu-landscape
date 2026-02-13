@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import json
 import os
@@ -69,6 +70,22 @@ def load_config(config_path: Path) -> Dict[str, Any]:
     env_email = os.environ.get("ENRICHMENT_EMAIL", "")
     if env_email:
         cfg["email"] = env_email
+
+    # Warn if email is empty — polite-pool APIs (Unpaywall, Crossref, OpenAlex)
+    # will use default rate-limited endpoints or may reject requests
+    if not cfg.get("email"):
+        polite_pool_sources = {"unpaywall", "crossref", "openalex"}
+        enabled_polite = [
+            s for s, sc in cfg.get("sources", {}).items()
+            if sc.get("enabled", True) and s in polite_pool_sources
+        ]
+        if enabled_polite:
+            print(
+                f"Warning: no email configured for polite-pool APIs ({', '.join(enabled_polite)}). "
+                "Set ENRICHMENT_EMAIL env var or 'email' in config for higher rate limits.",
+                file=sys.stderr,
+            )
+
     return cfg
 
 
@@ -146,8 +163,8 @@ class EnrichmentOrchestrator:
         """Run enrichment pipeline."""
         from sources import SOURCE_PHASES
 
-        # Always copy to avoid mutating the shared config dict (B-3/P-2)
-        effective_config = {**self.config}
+        # Deep copy to avoid mutating the shared config dict (B-3/P-2)
+        effective_config = copy.deepcopy(self.config)
         if max_age_days is not None:
             effective_config["max_age_days"] = max_age_days
 

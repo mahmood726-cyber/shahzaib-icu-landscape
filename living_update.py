@@ -62,13 +62,25 @@ def _get_last_run_date() -> Optional[str]:
     return last_date
 
 
-def _append_log(entry: Dict[str, Any]) -> None:
-    """Append a record to living_log.jsonl."""
+def _append_log(entry: Dict[str, Any], max_entries: int = 200) -> None:
+    """Append a record to living_log.jsonl, rotating if it exceeds max_entries."""
     LIVING_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with LIVING_LOG_PATH.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
         fh.flush()
         os.fsync(fh.fileno())
+
+    # Rotate: keep only the last max_entries lines
+    try:
+        lines = LIVING_LOG_PATH.read_text(encoding="utf-8").splitlines()
+        if len(lines) > max_entries:
+            keep = lines[-max_entries:]
+            tmp = LIVING_LOG_PATH.with_suffix(".jsonl.tmp")
+            tmp.write_text("\n".join(keep) + "\n", encoding="utf-8")
+            tmp.replace(LIVING_LOG_PATH)
+            print(f"  Log rotated: kept {len(keep)}/{len(lines)} entries", flush=True)
+    except OSError:
+        pass  # Non-fatal — log rotation failure should not break the pipeline
 
 
 def _run_step(cmd: List[str], step_name: str, dry_run: bool = False) -> bool:

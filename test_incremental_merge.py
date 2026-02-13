@@ -346,6 +346,114 @@ def test_backup_csv_preserves_utf8():
         assert rows[0]["title"] == "Crohn\u2019s Disease Trial"
 
 
+
+# ── Log rotation ─────────────────────────────────────────────────────
+
+def test_log_rotation_trims_to_max():
+    """_append_log should keep only the last max_entries lines."""
+    import living_update as lu
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        log_path = td / "test_log.jsonl"
+
+        # Monkey-patch the module-level LIVING_LOG_PATH
+        orig = lu.LIVING_LOG_PATH
+        lu.LIVING_LOG_PATH = log_path
+        try:
+            # Write 15 entries with max_entries=10
+            for i in range(15):
+                entry = {"run_id": f"run_{i}", "status": "success"}
+                lu._append_log(entry, max_entries=10)
+
+            lines = log_path.read_text(encoding="utf-8").strip().splitlines()
+            assert len(lines) == 10, f"Expected 10, got {len(lines)}"
+            # Should keep the LAST 10 (run_5 through run_14)
+            import json as _json
+            first = _json.loads(lines[0])
+            assert first["run_id"] == "run_5", f"Expected run_5, got {first['run_id']}"
+            last = _json.loads(lines[-1])
+            assert last["run_id"] == "run_14", f"Expected run_14, got {last['run_id']}"
+        finally:
+            lu.LIVING_LOG_PATH = orig
+
+
+def test_log_rotation_noop_under_limit():
+    """No rotation when entries are under max_entries."""
+    import living_update as lu
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        log_path = td / "test_log.jsonl"
+        orig = lu.LIVING_LOG_PATH
+        lu.LIVING_LOG_PATH = log_path
+        try:
+            for i in range(3):
+                lu._append_log({"run_id": f"run_{i}"}, max_entries=10)
+            lines = log_path.read_text(encoding="utf-8").strip().splitlines()
+            assert len(lines) == 3
+        finally:
+            lu.LIVING_LOG_PATH = orig
+
+
+# ── Capsule cleanup ──────────────────────────────────────────────────
+
+def test_capsule_cleanup_keeps_recent():
+    """_cleanup_old_capsules should keep the most recent N files."""
+    from truthcert import _cleanup_old_capsules
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        # Create 15 fake timestamped capsule files
+        for i in range(15):
+            name = f"capsule_broad_20260201T{i:06d}Z.json"
+            (td / name).write_text("{}", encoding="utf-8")
+
+        _cleanup_old_capsules(td, "broad", keep=5)
+
+        remaining = sorted(td.glob("capsule_broad_*.json"))
+        assert len(remaining) == 5, f"Expected 5, got {len(remaining)}"
+        # Should keep the 5 most recent (highest timestamps)
+        assert remaining[0].name == "capsule_broad_20260201T000010Z.json"
+        assert remaining[-1].name == "capsule_broad_20260201T000014Z.json"
+
+
+def test_capsule_cleanup_noop_under_limit():
+    """No deletion when fewer than keep capsules exist."""
+    from truthcert import _cleanup_old_capsules
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        for i in range(3):
+            name = f"capsule_broad_20260201T{i:06d}Z.json"
+            (td / name).write_text("{}", encoding="utf-8")
+
+        _cleanup_old_capsules(td, "broad", keep=10)
+
+        remaining = list(td.glob("capsule_broad_*.json"))
+        assert len(remaining) == 3
+
+
+def test_capsule_cleanup_ignores_latest():
+    """Cleanup should not touch the non-timestamped 'latest' capsule."""
+    from truthcert import _cleanup_old_capsules
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        # Latest capsule (non-timestamped)
+        (td / "capsule.json").write_text("{}", encoding="utf-8")
+        (td / "capsule_placebo.json").write_text("{}", encoding="utf-8")
+
+        # 3 timestamped
+        for i in range(3):
+            name = f"capsule_broad_20260201T{i:06d}Z.json"
+            (td / name).write_text("{}", encoding="utf-8")
+
+        _cleanup_old_capsules(td, "broad", keep=2)
+
+        # Latest capsules untouched
+        assert (td / "capsule.json").exists()
+        assert (td / "capsule_placebo.json").exists()
+        # 2 timestamped kept
+        remaining = list(td.glob("capsule_broad_*.json"))
+        assert len(remaining) == 2
+
+
 if __name__ == "__main__":
     import traceback
 
@@ -361,6 +469,11 @@ if __name__ == "__main__":
         test_merge_preserves_fieldnames_from_backup,
         test_merge_backup_cleanup,
         test_backup_csv_preserves_utf8,
+        test_log_rotation_trims_to_max,
+        test_log_rotation_noop_under_limit,
+        test_capsule_cleanup_keeps_recent,
+        test_capsule_cleanup_noop_under_limit,
+        test_capsule_cleanup_ignores_latest,
     ]
 
     passed = 0

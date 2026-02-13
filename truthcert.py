@@ -545,8 +545,32 @@ def build_capsule(
         dash_tmp.write_text(json.dumps(capsule, indent=2, ensure_ascii=False), encoding="utf-8")
         dash_tmp.replace(dash_final)
 
+    # 10. Cleanup old capsules — keep only the most recent N timestamped files
+    _cleanup_old_capsules(capsule_dir, label, keep=10)
+
     p0_count = sum(1 for v in validations if v.severity == "P0" and v.passed)
     p0_total = sum(1 for v in validations if v.severity == "P0")
     print(f"TruthCert: {capsule_id} | badge={badge} | P0={p0_count}/{p0_total} | drift={len(drift_events)} events")
 
     return capsule
+
+
+def _cleanup_old_capsules(capsule_dir: Path, label: str, keep: int = 10) -> None:
+    """Delete old timestamped capsule files, keeping the most recent `keep`."""
+    if not capsule_dir.exists():
+        return
+    pattern = f"capsule_{label}_*.json"
+    timestamped = []
+    for path in capsule_dir.glob(pattern):
+        if _CAPSULE_FN_RE.match(path.name):
+            timestamped.append(path)
+    # Sort by filename (timestamps sort lexicographically)
+    timestamped.sort(key=lambda p: p.name)
+    to_delete = timestamped[:-keep] if len(timestamped) > keep else []
+    for path in to_delete:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+    if to_delete:
+        print(f"  Capsule cleanup: removed {len(to_delete)} old capsule(s), kept {min(len(timestamped), keep)}")
