@@ -230,7 +230,7 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
     ),
     "perfusion": re.compile(
         r"(?:cerebral\s+perfusion(?!\s+pressure)"
-        r"|myocardial\s+perfusion"
+        r"|myocardial\s+perfusion\s+(?:scan|imaging|study|scintigraphy|spect|pet)"
         r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
         re.IGNORECASE,
     ),

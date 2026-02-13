@@ -318,7 +318,10 @@ function addExportToolbar(containerId) {
   const mkBtn = (label, fmt) => {
     const btn = document.createElement("button");
     btn.className = "btn btn--ghost";
+    const title = "Download " + label + (fmt === "png" ? " (2x)" : "");
     btn.textContent = label;
+    btn.title = title;
+    btn.setAttribute("aria-label", title);
     btn.style.cssText = "font-size:.75rem;padding:2px 8px;margin-right:4px";
     btn.addEventListener("click", () => {
       const el = document.getElementById(containerId + "Chart");
