@@ -107,22 +107,6 @@ CREATE INDEX IF NOT EXISTS idx_ann_pmid ON annotations(pmid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ann_unique
     ON annotations(COALESCE(pmid, ''), COALESCE(pmcid, ''), ann_type, ann_name, COALESCE(exact, ''));
 
--- WHO ICTRP cross-references
-CREATE TABLE IF NOT EXISTS who_ictrp (
-    who_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nct_id TEXT NOT NULL,
-    trial_id TEXT NOT NULL,
-    registry TEXT,
-    public_title TEXT,
-    recruitment_status TEXT,
-    countries TEXT,
-    url TEXT,
-    source TEXT NOT NULL DEFAULT 'who_ictrp',
-    fetched_utc TEXT NOT NULL,
-    UNIQUE(nct_id, trial_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_who_nct ON who_ictrp(nct_id);
 
 -- Adverse event counts by drug (openFDA FAERS)
 CREATE TABLE IF NOT EXISTS faers_signals (

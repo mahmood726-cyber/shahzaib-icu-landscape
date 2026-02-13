@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""
+Living update orchestrator for the ICU Living Evidence Map.
+
+Runs the full pipeline with incremental updates:
+  1. Determine last successful run date from living_log.jsonl
+  2. Fetch new/updated trials from CT.gov
+  3. Search PubMed primary (incremental since last run)
+  4. Enrich new trials (optional)
+  5. Build living map with all source CSVs
+  6. Append cycle record to living_log.jsonl
+
+Usage:
+  python living_update.py                    # Full living update
+  python living_update.py --dry-run          # Show what would execute
+  python living_update.py --skip-enrich      # Skip enrichment step
+  python living_update.py --sources ctgov    # Only CT.gov source
+  python living_update.py --force-full       # Ignore incremental, full refresh
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+ROOT = Path(__file__).resolve().parent
+LIVING_LOG_PATH = ROOT / "living_log.jsonl"
+OUTPUT_DIR = ROOT / "output"
+DASHBOARD_DIR = ROOT / "dashboard" / "data"
+LOG_DIR = ROOT / "logs"
+
+
+def _get_last_run_date() -> Optional[str]:
+    """Read the last successful run date from living_log.jsonl."""
+    if not LIVING_LOG_PATH.exists():
+        return None
+    last_date = None
+    try:
+        with LIVING_LOG_PATH.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("status") == "success":
+                        ts = entry.get("completed_utc", "")
+                        if ts and len(ts) >= 10:
+                            last_date = ts[:10]
+                except (json.JSONDecodeError, KeyError):
+                    continue
+    except OSError:
+        return None
+    return last_date
+
+
+def _append_log(entry: Dict[str, Any]) -> None:
+    """Append a record to living_log.jsonl."""
+    LIVING_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with LIVING_LOG_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def _run_step(cmd: List[str], step_name: str, dry_run: bool = False) -> bool:
+    """Run a pipeline step. Returns True on success."""
+    print(f"\n{'[DRY RUN] ' if dry_run else ''}Step: {step_name}", flush=True)
+    print(f"  Command: {' '.join(cmd)}", flush=True)
+
+    if dry_run:
+        return True
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=str(ROOT),
+            capture_output=False,
+            timeout=3600,  # 1 hour max per step
+        )
+        if result.returncode != 0:
+            print(f"  FAILED: {step_name} (exit code {result.returncode})", file=sys.stderr)
+            return False
+        return True
+    except subprocess.TimeoutExpired:
+        print(f"  TIMEOUT: {step_name} (exceeded 1 hour)", file=sys.stderr)
+        return False
+    except FileNotFoundError as exc:
+        print(f"  ERROR: {step_name} — {exc}", file=sys.stderr)
+        return False
+
+
+def _find_python() -> str:
+    """Find the Python executable."""
+    # On Windows, python3 typically doesn't exist — try python first
+    import platform as _plat
+    candidates = ["python", "python3"] if _plat.system() == "Windows" else ["python3", "python"]
+    for candidate in candidates:
+        try:
+            result = subprocess.run(
+                [candidate, "--version"],
+                capture_output=True, timeout=5,
+            )
+            if result.returncode == 0:
+                return candidate
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    return sys.executable
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="ICU Living Map — daily living update")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would execute, don't run")
+    parser.add_argument("--skip-enrich", action="store_true", help="Skip enrichment step")
+    parser.add_argument("--sources", default="ctgov,pubmed",
+                        help="Comma-separated sources to run (default: ctgov,pubmed)")
+    parser.add_argument("--force-full", action="store_true",
+                        help="Ignore incremental date, full refresh")
+    parser.add_argument("--label", default="broad", help="Build label (default: broad)")
+    args = parser.parse_args()
+
+    python = _find_python()
+    sources = set(s.strip().lower() for s in args.sources.split(",") if s.strip())
+    run_id = str(uuid.uuid4())[:8]
+    started_utc = datetime.now(timezone.utc).isoformat()
+
+    print(f"Living Update — run_id={run_id}, sources={sorted(sources)}", flush=True)
+
+    # Determine incremental date
+    last_date = None if args.force_full else _get_last_run_date()
+    if last_date:
+        print(f"  Incremental since: {last_date}", flush=True)
+    else:
+        print("  Full refresh (no previous run or --force-full)", flush=True)
+
+    errors: List[str] = []
+    warnings: List[str] = []
+    sources_run: List[str] = []
+
+    # Step 1: Fetch CT.gov
+    if "ctgov" in sources:
+        cmd = [python, "fetch_ctgov_icu_placebo.py"]
+        if last_date and not args.force_full:
+            cmd.extend(["--updated-since", last_date])
+        if _run_step(cmd, "Fetch CT.gov", dry_run=args.dry_run):
+            sources_run.append("ctgov")
+        else:
+            errors.append("ctgov fetch failed")
+
+    # Step 2: Search PubMed primary
+    if "pubmed" in sources:
+        cmd = [python, "search_pubmed_primary.py"]
+        if last_date and not args.force_full:
+            cmd.extend(["--updated-since", last_date])
+        if _run_step(cmd, "Search PubMed primary", dry_run=args.dry_run):
+            sources_run.append("pubmed")
+        else:
+            errors.append("pubmed search failed")
+
+    # Step 3: Enrich
+    if not args.skip_enrich:
+        studies_path = OUTPUT_DIR / "icu_rct_broad_studies.csv"
+        if not studies_path.exists() and not args.dry_run:
+            warnings.append("enrichment skipped: studies CSV missing")
+        else:
+            cmd = [python, "enrich_orchestrator.py"]
+            if not _run_step(cmd, "Enrich trials", dry_run=args.dry_run):
+                warnings.append("enrichment failed (non-fatal)")
+
+    # Step 4: Build living map
+    cmd = [
+        python, "build_living_map.py",
+        "--label", args.label,
+        "--dashboard-dir", str(DASHBOARD_DIR),
+    ]
+
+    # Add multi-source CSVs if available
+    pubmed_studies = OUTPUT_DIR / "pubmed_icu_studies.csv"
+    pubmed_hemo = OUTPUT_DIR / "pubmed_icu_hemo.csv"
+
+    if pubmed_studies.exists():
+        cmd.extend(["--pubmed-studies", str(pubmed_studies)])
+    if pubmed_hemo.exists():
+        cmd.extend(["--pubmed-hemo", str(pubmed_hemo)])
+
+    # Add enrichment if DB exists and not skipped
+    enrich_db = ROOT / "enrichment" / "enrichment_db.sqlite"
+    if not args.skip_enrich and enrich_db.exists():
+        cmd.extend(["--enrich", "--enrich-db", str(enrich_db)])
+
+    studies_path = OUTPUT_DIR / "icu_rct_broad_studies.csv"
+    hemo_path = OUTPUT_DIR / "icu_rct_broad_hemodynamic_mentions.csv"
+    build_ok = True
+    if not args.dry_run and (not studies_path.exists() or not hemo_path.exists()):
+        build_ok = False
+        missing = []
+        if not studies_path.exists():
+            missing.append(str(studies_path))
+        if not hemo_path.exists():
+            missing.append(str(hemo_path))
+        errors.append(f"build skipped: missing required inputs ({'; '.join(missing)})")
+        print("  ERROR: build skipped due to missing required inputs", file=sys.stderr)
+    else:
+        build_ok = _run_step(cmd, "Build living map", dry_run=args.dry_run)
+    if not build_ok:
+        errors.append("build failed")
+
+    # Step 5: Log
+    completed_utc = datetime.now(timezone.utc).isoformat()
+    if not build_ok:
+        status = "failure"
+    elif errors:
+        status = "partial_failure"
+    else:
+        status = "success"
+
+    log_entry = {
+        "run_id": run_id,
+        "started_utc": started_utc,
+        "completed_utc": completed_utc,
+        "status": status,
+        "sources_run": sources_run,
+        "label": args.label,
+        "incremental_since": last_date,
+        "errors": errors + warnings,
+        "warnings": warnings,
+        "dry_run": args.dry_run,
+    }
+
+    if not args.dry_run:
+        _append_log(log_entry)
+        print(f"\nLiving update {status}: run_id={run_id}, sources={sources_run}", flush=True)
+    else:
+        print(f"\n[DRY RUN] Would log: {json.dumps(log_entry, indent=2)}", flush=True)
+
+    if errors or warnings:
+        print(f"  Warnings: {errors + warnings}", file=sys.stderr)
+
+    return 0 if status != "failure" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

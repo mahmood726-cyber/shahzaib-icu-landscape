@@ -6,7 +6,7 @@ Produces proof-carrying provenance bundles:
   - Input/output file hashes (SHA-256)
   - Ontology versioning (deterministic hash of CANONICAL_RULES + UNIT_PATTERNS)
   - Git SHA + machine ID for traceability
-  - 13 validators across P0/P1/P2 severity classes
+  - 16 base validators + 5 enrichment-conditional across P0/P1/P2 severity classes
   - Drift detection against previous capsules
   - Assurance badge (Bronze / Silver / Gold)
   - Abstention list (unmapped keywords)
@@ -182,6 +182,17 @@ def detect_drift(
             "old": prev_ontology[:24],
             "new": ontology_version[:24],
             "severity": "major",
+        })
+
+    # Source count change (multi-source tracking)
+    prev_source_count = prev_capsule.get("_source_count", 0)
+    current_source_count = current_totals.get("_source_count", 0)
+    if prev_source_count and current_source_count and prev_source_count != current_source_count:
+        events.append({
+            "metric": "source_count",
+            "old": prev_source_count,
+            "new": current_source_count,
+            "severity": "moderate" if abs(current_source_count - prev_source_count) <= 1 else "major",
         })
 
     return events
@@ -383,12 +394,14 @@ def build_capsule(
     raw_jsonl: Optional[Path] = None,
     enrich_db: Optional[Path] = None,
     run_timestamp: Optional[str] = None,
+    search_strategy: Optional[Dict[str, Any]] = None,
+    extra_input_files: Optional[List[Path]] = None,
 ) -> Dict[str, Any]:
     """
     Build a TruthCert capsule:
       1. Hash inputs and outputs
       2. Compute ontology version
-      3. Run 13 validators
+      3. Run validators (16 base + 5 enrichment-conditional)
       4. Detect drift against previous capsule
       5. Calculate badge
       6. Collect abstentions
@@ -436,6 +449,11 @@ def build_capsule(
             input_hashes[path.name] = compute_file_hash(path)
     if raw_jsonl is not None and raw_jsonl.exists():
         input_hashes[raw_jsonl.name] = compute_file_hash(raw_jsonl)
+    # Hash additional source CSVs (PubMed primary)
+    if extra_input_files:
+        for extra_path in extra_input_files:
+            if extra_path is not None and extra_path.exists():
+                input_hashes[extra_path.name] = compute_file_hash(extra_path)
     if enrich_db is not None and enrich_db.exists():
         try:
             input_hashes["enrichment_db.sqlite"] = compute_file_hash(enrich_db)
@@ -497,6 +515,7 @@ def build_capsule(
         "abstentions": abstentions,
         "previous_capsule_id": prev_capsule.get("capsule_id") if prev_capsule else None,
         "enrichment_db_hash": input_hashes.get("enrichment_db.sqlite"),
+        "search_strategy": search_strategy,
         "_summary_totals": current_totals,
     }
 

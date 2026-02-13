@@ -3,7 +3,7 @@
 Enrichment orchestrator for the ICU Living Map pipeline.
 
 Queries 8 external data sources and stores results in SQLite.
-Respects dependency chain: Phase 1 (PubMed, EuropePMC, WHO ICTRP, openFDA)
+Respects dependency chain: Phase 1 (PubMed, EuropePMC, openFDA)
 runs first to collect PMIDs/DOIs (and drug signals), then Phase 2
 (OpenAlex, Crossref, OpenCitations, Unpaywall) uses those DOIs.
 
@@ -191,6 +191,13 @@ class EnrichmentOrchestrator:
                     f"Source '{name}' is enabled but not in SOURCE_PHASES. "
                     "Add it to sources/__init__.py before running."
                 )
+            cfg_phase = self.config.get("sources", {}).get(name, {}).get("phase")
+            if cfg_phase is not None and cfg_phase != SOURCE_PHASES.get(name):
+                print(
+                    f"Warning: config phase {cfg_phase} for '{name}' ignored; "
+                    f"using SOURCE_PHASES={SOURCE_PHASES.get(name)}",
+                    file=sys.stderr,
+                )
 
         # Split sources by phase — dynamically iterate ALL phases present
         # in SOURCE_PHASES (not just 1 and 2) to avoid silently dropping
@@ -302,16 +309,6 @@ class EnrichmentOrchestrator:
         else:
             summary["is_oa"] = False
             summary["oa_status"] = None
-
-        # WHO ICTRP
-        who = conn.execute(
-            "SELECT trial_id, countries FROM who_ictrp WHERE nct_id = ?",
-            (nct_id,),
-        ).fetchall()
-        summary["who_trial_id"] = [r["trial_id"] for r in who]
-        summary["who_countries"] = "; ".join(
-            sorted(set(r["countries"] for r in who if r["countries"]))
-        )
 
         # FAERS
         faers = conn.execute(

@@ -2,7 +2,7 @@
 """
 TruthCert validators for the ICU Living Map pipeline.
 
-13 validation rules across three severity classes:
+16 base validation rules (+ 5 enrichment-conditional) across three severity classes:
   P0 (Block)  — hard failures that invalidate the capsule
   P1 (Warn)   — quality concerns that degrade the badge
   P2 (Info)   — informational checks logged for provenance
@@ -10,10 +10,12 @@ TruthCert validators for the ICU Living Map pipeline.
 from __future__ import annotations
 
 import csv
+import os
 import re
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 
 @dataclass
@@ -36,7 +38,7 @@ STUDIES_COLUMNS = [
     "completion_date", "last_update_posted", "results_first_posted",
     "has_results", "enrollment_count", "enrollment_type", "conditions",
     "keywords", "arm_count", "placebo_arm_count", "outcome_count",
-    "hemo_outcome_count", "updated_since", "query_name",
+    "hemo_outcome_count", "countries", "updated_since", "query_name",
 ]
 
 HEMO_COLUMNS = [
@@ -51,7 +53,7 @@ OUTPUT_COLUMNS = [
     "conditions", "study_keywords", "arm_count", "placebo_arm_count",
     "has_placebo_arm", "outcome_type", "measure", "keyword",
     "normalized_keyword", "unit_raw", "normalized_unit", "matched_text",
-    "query_name",
+    "query_name", "countries", "data_sources",
 ]
 
 SUMMARY_TOTAL_FIELDS = [
@@ -153,19 +155,51 @@ def validate_summary_totals(summary: Dict[str, Any]) -> ValidationResult:
                             f"All {len(SUMMARY_TOTAL_FIELDS)} summary total fields are valid non-negative integers")
 
 
+_TRIAL_ID_RE = re.compile(
+    r"^(?:"
+    r"NCT\d{8}"              # ClinicalTrials.gov
+    r"|PMID:\d+"             # PubMed primary
+    r"|EUCTR[-\d]+"          # EU Clinical Trials Register
+    r"|ISRCTN\d+"            # ISRCTN
+    r"|ACTRN\d+"             # Australian NZ CTR
+    r"|ChiCTR[-\w]+"         # Chinese CTR
+    r"|DRKS\d+"              # German CTR
+    r"|JPRN[-\w]+"           # Japan CTR
+    r"|CTRI/[-\w/]+"         # India CTR
+    r"|PACTR\d+"             # Pan African CTR
+    r"|REBEC[-\w]+"          # Brazilian CTR
+    r"|KCT\d+"               # Korean CTR
+    r"|IRCT[-\w]+"           # Iranian CTR
+    r"|TCTR\d+"              # Thai CTR
+    r"|SLCTR/[-\w/]+"        # Sri Lanka CTR
+    r"|RPCEC[-\w]+"          # Cuban CTR
+    r"|PER[-\w]+"            # Peruvian CTR
+    r"|NTR\d+"               # Netherlands CTR
+    r"|[\w]+-[\w]+-\d+"      # Other registry formats (e.g., LBCTR-xxx-nnn)
+    r")$"
+)
+
+
 def validate_nct_format(output_csv: Path) -> ValidationResult:
-    """P0-nct-format: ALL NCT IDs match NCT\\d{8} pattern (V-7)."""
+    """P0-nct-format: ALL trial IDs match a known registry pattern (V-7).
+
+    Accepts NCT IDs (ClinicalTrials.gov) and PMID:nnn (PubMed primary).
+    """
     nct_ids = _read_csv_column(output_csv, "nct_id", max_rows=50_000)
     if not nct_ids:
         return ValidationResult("P0-nct-format", "P0", False,
-                                "No NCT IDs found in output CSV")
-    bad = [nid for nid in nct_ids if not _NCT_RE.match(nid)]
+                                "No trial IDs found in output CSV")
+    bad = [nid for nid in nct_ids if not _TRIAL_ID_RE.match(nid)]
     if bad:
         sample = bad[:5]
         return ValidationResult("P0-nct-format", "P0", False,
-                                f"{len(bad)} malformed NCT IDs (sample: {sample})")
-    return ValidationResult("P0-nct-format", "P0", True,
-                            f"All {len(nct_ids)} sampled NCT IDs are valid")
+                                f"{len(bad)} malformed trial IDs (sample: {sample})")
+    nct_count = sum(1 for nid in nct_ids if nid.startswith("NCT"))
+    non_nct = len(nct_ids) - nct_count
+    msg = f"All {len(nct_ids)} sampled trial IDs are valid"
+    if non_nct > 0:
+        msg += f" ({nct_count} NCT, {non_nct} other registries)"
+    return ValidationResult("P0-nct-format", "P0", True, msg)
 
 
 def validate_total_consistency(summary: Dict[str, Any]) -> ValidationResult:
@@ -423,6 +457,143 @@ def validate_enrichment_hashes(enrich_db: Optional[Path]) -> ValidationResult:
         f"{count} source hash(es) recorded")
 
 
+# ── P2 search quality validators ──────────────────────────────────────
+
+def _get_tooling_root() -> Path:
+    """Resolve ctgov-search-strategies toolkit root (shared with fetch script)."""
+    return Path(
+        os.environ.get("CTGOV_TOOLING_ROOT",
+                       Path(__file__).resolve().parent.parent / "ctgov-search-strategies")
+    )
+
+
+def validate_search_quality(summary: Dict[str, Any]) -> ValidationResult:
+    """P2-search-quality: Run PRESS 2015 syntax check on the search query.
+
+    Note: PRESS 2015 (McGowan et al.) was designed for bibliographic database
+    searches (MEDLINE/Embase), not registry queries. CT.gov lacks MeSH headings
+    and proximity operators, so PRESS element scores for those categories are
+    not meaningful. The overall score is reported as indicative only.
+    """
+    search_strategy = summary.get("search_strategy", {})
+    query_text = search_strategy.get("query_text", "")
+    if not query_text:
+        return ValidationResult("P2-search-quality", "P2", True,
+                                "No query text available — skipped")
+    try:
+        tooling_root = _get_tooling_root()
+        if str(tooling_root) not in sys.path:
+            sys.path.insert(0, str(tooling_root))
+        from search_methodology import PRESSValidator  # type: ignore
+        report = PRESSValidator().validate(query_text, database="ClinicalTrials.gov")
+        passed = report.is_acceptable
+        return ValidationResult(
+            "P2-search-quality", "P2", passed,
+            f"PRESS score {report.overall_score:.2f} "
+            f"({'acceptable' if passed else 'below 0.70'}) "
+            f"— indicative only (PRESS designed for bibliographic DBs, not registry queries)")
+    except ImportError:
+        return ValidationResult("P2-search-quality", "P2", True,
+                                "PRESSValidator not available (ctgov-search-strategies not on path) — skipped")
+    except Exception as exc:
+        return ValidationResult("P2-search-quality", "P2", False,
+                                f"PRESS validation error: {exc}")
+
+
+def validate_recall_reference_standard(
+    summary: Dict[str, Any],
+    studies_csv: Path,
+) -> ValidationResult:
+    """P2-recall-reference: Check recall against curated reference-standard NCT IDs.
+
+    Checks the studies CSV (raw search results) rather than the output CSV
+    (post-hemo filtering), because this validates search query coverage,
+    not downstream outcome filtering.
+
+    Uses "reference standard" (not "gold standard") per Cochrane Handbook
+    terminology — this is a curated convenience set, not an exhaustive truth.
+    """
+    search_strategy = summary.get("search_strategy", {})
+    ref_ids = search_strategy.get("recall_reference_nct_ids", [])
+    if not ref_ids:
+        return ValidationResult("P2-recall-reference", "P2", True,
+                                "No reference-standard NCT IDs configured — skipped")
+    # Read NCT IDs from the studies CSV (search results, pre-hemo filtering)
+    found_ids = set(_read_csv_column(studies_csv, "nct_id", max_rows=100_000))
+    ref_set = set(ref_ids)
+    matched = ref_set & found_ids
+    recall = len(matched) / len(ref_set) if ref_set else 0.0
+    missed = sorted(ref_set - found_ids)
+    msg = f"{len(matched)}/{len(ref_set)} reference-standard NCT IDs found ({recall:.0%})"
+    if missed:
+        msg += f"; missed: {missed[:5]}"
+    return ValidationResult("P2-recall-reference", "P2", recall >= 0.50, msg)
+
+
+# ── Multi-source validators ──────────────────────────────────────────
+
+def validate_multi_source_coverage(summary: Dict[str, Any]) -> ValidationResult:
+    """P1-multi-source-coverage: At least 2 of 2 primary sources contributed records."""
+    flow = summary.get("prisma_flow", {})
+    ctgov = flow.get("ctgov_retrieved", 0)
+    pubmed = flow.get("pubmed_retrieved", 0)
+    active = sum(1 for count in [ctgov, pubmed] if count > 0)
+    passed = active >= 2
+    return ValidationResult(
+        "P1-multi-source-coverage", "P1", passed,
+        f"{active}/2 primary sources active (CT.gov={ctgov}, PubMed={pubmed}); threshold 2")
+
+
+def validate_dedup_integrity(output_csv: Path) -> ValidationResult:
+    """P1-dedup-integrity: No duplicate trial IDs from different sources without merge.
+
+    Multiple rows per trial is expected (one per hemo mention). But the same
+    trial_id should NOT appear with conflicting data_sources — that indicates
+    the multi-source dedup failed to merge records properly.
+    """
+    if not output_csv.exists():
+        return ValidationResult("P1-dedup-integrity", "P1", True,
+                                "Output CSV not found — skipped")
+    trial_sources: Dict[str, Set[str]] = {}
+    with output_csv.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        for i, row in enumerate(reader):
+            if i >= 100_000:
+                break
+            nct_id = (row.get("nct_id") or "").strip()
+            sources = (row.get("data_sources") or "ctgov").strip()
+            if nct_id:
+                if nct_id not in trial_sources:
+                    trial_sources[nct_id] = set()
+                trial_sources[nct_id].add(sources)
+    if not trial_sources:
+        return ValidationResult("P1-dedup-integrity", "P1", True,
+                                "No trial IDs to check")
+    # Flag trials that appear with inconsistent data_sources strings
+    # (e.g., same NCT ID with "ctgov" in one row and "ctgov;pubmed" in another)
+    inconsistent = [
+        tid for tid, src_set in trial_sources.items()
+        if len(src_set) > 1
+    ]
+    if inconsistent:
+        sample = inconsistent[:5]
+        return ValidationResult(
+            "P1-dedup-integrity", "P1", False,
+            f"{len(inconsistent)} trial(s) with inconsistent data_sources (sample: {sample})")
+    return ValidationResult("P1-dedup-integrity", "P1", True,
+                            f"{len(trial_sources)} unique trials checked — dedup consistent")
+
+
+def validate_registry_diversity(summary: Dict[str, Any]) -> ValidationResult:
+    """P2-registry-diversity: Report number of distinct registries represented."""
+    registries = summary.get("registries", {})
+    count = len(registries)
+    total_trials = sum(registries.values()) if registries else 0
+    return ValidationResult(
+        "P2-registry-diversity", "P2", True,
+        f"{count} distinct registries represented ({total_trials} total trials)")
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────
 
 def run_validators(
@@ -457,6 +628,13 @@ def run_validators(
         validate_ontology_version_logged(ontology_version),
         validate_raw_input_hashed(input_hashes),
         validate_parquet_generated(summary),
+        # P2 — Search strategy
+        validate_search_quality(summary),
+        validate_recall_reference_standard(summary, studies_csv),
+        # Multi-source validators
+        validate_multi_source_coverage(summary),
+        validate_dedup_integrity(output_csv),
+        validate_registry_diversity(summary),
     ]
 
     # Enrichment validators (only when enrichment data is present)

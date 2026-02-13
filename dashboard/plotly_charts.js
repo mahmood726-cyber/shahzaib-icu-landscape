@@ -344,7 +344,6 @@ const PlotlyCharts = (() => {
 
     const flow = summary.prisma_flow || {};
     const ctgov = flow.ctgov_retrieved || flow.retrieved_from_api || 0;
-    const who = flow.who_ictrp_retrieved || 0;
     const pubmed = flow.pubmed_retrieved || 0;
     const afterDedup = flow.total_after_dedup || flow.valid_nct_ids || ctgov;
     const withHemo = flow.with_hemodynamic_outcomes || 0;
@@ -372,19 +371,15 @@ const PlotlyCharts = (() => {
           </marker>
         </defs>
         <text x="360" y="24" font-family="Palatino Linotype, serif" font-size="16" font-weight="bold" fill="${tc.text}" text-anchor="middle">PRISMA-S Flow Diagram (searched ${searchDate})</text>
-        <rect x="20" y="45" width="200" height="55" ${boxStyle} />
-        <text x="120" y="68" ${textStyle} font-weight="bold">ClinicalTrials.gov</text>
-        <text x="120" y="86" ${smallStyle}>${formatNumber(ctgov)} records</text>
-        <rect x="260" y="45" width="200" height="55" ${boxStyle} />
-        <text x="360" y="68" ${textStyle} font-weight="bold">WHO ICTRP</text>
-        <text x="360" y="86" ${smallStyle}>${formatNumber(who)} records</text>
-        <rect x="500" y="45" width="200" height="55" ${boxStyle} />
-        <text x="600" y="68" ${textStyle} font-weight="bold">PubMed</text>
-        <text x="600" y="86" ${smallStyle}>${formatNumber(pubmed)} records</text>
-        <line x1="120" y1="100" x2="120" y2="130" ${arrowStyle} />
-        <line x1="360" y1="100" x2="360" y2="130" ${arrowStyle} />
-        <line x1="600" y1="100" x2="600" y2="130" ${arrowStyle} />
-        <line x1="120" y1="130" x2="600" y2="130" stroke="${COLORS.accent2}" stroke-width="1.5" />
+        <rect x="110" y="45" width="220" height="55" ${boxStyle} />
+        <text x="220" y="68" ${textStyle} font-weight="bold">ClinicalTrials.gov</text>
+        <text x="220" y="86" ${smallStyle}>${formatNumber(ctgov)} records</text>
+        <rect x="390" y="45" width="220" height="55" ${boxStyle} />
+        <text x="500" y="68" ${textStyle} font-weight="bold">PubMed</text>
+        <text x="500" y="86" ${smallStyle}>${formatNumber(pubmed)} records</text>
+        <line x1="220" y1="100" x2="220" y2="130" ${arrowStyle} />
+        <line x1="500" y1="100" x2="500" y2="130" ${arrowStyle} />
+        <line x1="220" y1="130" x2="500" y2="130" stroke="${COLORS.accent2}" stroke-width="1.5" />
         <line x1="360" y1="130" x2="360" y2="155" ${arrowStyle} />
         <rect x="210" y="155" width="300" height="55" rx="8" ry="8" fill="${highlightFill}" stroke="${COLORS.accent2}" stroke-width="1.5" />
         <text x="360" y="178" ${textStyle} font-weight="bold">After deduplication</text>

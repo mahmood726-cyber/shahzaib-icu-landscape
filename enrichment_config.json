@@ -14,14 +14,7 @@
       "retries": 3,
       "base_url": "https://www.ebi.ac.uk/europepmc/webservices/rest"
     },
-    "who_ictrp": {
-      "enabled": true,
-      "phase": 1,
-      "rate_limit": 0,
-      "retries": 1,
-      "base_url": "",
-      "note": "Offline/local CSV source — no HTTP rate limit needed"
-    },
+
     "openalex": {
       "enabled": true,
       "phase": 2,
@@ -62,9 +55,21 @@
     }
   },
   "phase_ordering": {
-    "description": "Phase 1 sources (PubMed, EuropePMC, WHO ICTRP) provide PMIDs and DOIs. Phase 2 sources (OpenAlex, Crossref, Unpaywall, OpenCitations) use DOIs from Phase 1. Phase 3 (OpenFDA) is independent safety surveillance data.",
+    "description": "Phase 1 sources (PubMed, EuropePMC) provide PMIDs and DOIs. Phase 2 sources (OpenAlex, Crossref, Unpaywall, OpenCitations) use DOIs from Phase 1. Phase 3 (OpenFDA) is independent safety surveillance data.",
     "phases": [1, 2, 3]
   },
   "max_age_days": 30,
-  "email": ""
+  "email": "",
+  "primary_sources": {
+    "description": "Primary search sources for trial identification (separate from enrichment)",
+    "ctgov": {
+      "enabled": true,
+      "note": "ClinicalTrials.gov API v2 — primary registry search"
+    },
+
+    "pubmed": {
+      "enabled": true,
+      "note": "PubMed E-utilities — published RCTs that may lack CT.gov registration"
+    }
+  }
 }

@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Hemodynamic Evidence Insights — analytical dashboard for ICU RCT evidence gaps, temporal trends, and research priorities." />
+  <title>Hemodynamic Evidence Insights</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="lib/plotly.min.js" defer></script>
+  <style>
+    /* ── Insights-specific styles ────────────────────────────────────── */
+    .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--clr-accent);
+      text-decoration:none;font-weight:600;font-size:.95rem;margin-bottom:8px;transition:opacity .2s}
+    .back-link:hover{opacity:.7}
+
+    .score-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-md)}
+    .score-card{background:var(--clr-surface-raised);padding:20px;border-radius:var(--radius-xl);
+      box-shadow:var(--shadow-lg);border:1px solid var(--clr-border-light);text-align:center;position:relative;overflow:hidden}
+    .score-card .score-value{font-size:2.4rem;font-weight:700;line-height:1.1;margin:8px 0 4px;
+      font-family:var(--font-heading),serif}
+    .score-card .score-label{font-size:.85rem;color:var(--clr-text-muted);text-transform:uppercase;letter-spacing:.04em}
+    .score-card .score-sub{font-size:.8rem;color:var(--clr-text-muted);margin-top:4px}
+    .score-card .score-bar{position:absolute;bottom:0;left:0;height:4px;border-radius:0 2px 0 0;transition:width .8s ease}
+    .score-green .score-value{color:#1a9850} .score-green .score-bar{background:#1a9850}
+    .score-amber .score-value{color:#e67e22} .score-amber .score-bar{background:#e67e22}
+    .score-red .score-value{color:#d73027} .score-red .score-bar{background:#d73027}
+
+    .insight-box{background:var(--clr-surface-raised);border-left:4px solid var(--clr-accent);
+      padding:14px 18px;border-radius:0 var(--radius-md) var(--radius-md) 0;margin-top:16px;font-size:.9rem}
+    .insight-box ul{margin:6px 0 0 16px;padding:0}
+    .insight-box li{margin-bottom:4px}
+    .insight-box .insight-title{font-weight:700;margin-bottom:6px;color:var(--clr-accent)}
+
+    .priority-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:12px}
+    .priority-table th,.priority-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--clr-border-light)}
+    .priority-table th{font-weight:600;color:var(--clr-text-muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.03em}
+    .priority-table tr:hover td{background:var(--clr-surface)}
+    .priority-table .bar-cell{position:relative;min-width:120px}
+    .priority-table .bar-fill{position:absolute;top:50%;transform:translateY(-50%);left:0;height:18px;
+      border-radius:3px;opacity:.3;transition:width .6s ease}
+
+    .chart-2x2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:768px){.chart-2x2{grid-template-columns:1fr}}
+
+    .toggle-group{display:flex;gap:4px;margin-bottom:10px}
+    .toggle-group button{padding:4px 12px;border:1px solid var(--clr-border-light);border-radius:var(--radius-pill);
+      background:var(--clr-surface);color:var(--clr-ink);font-size:.8rem;cursor:pointer;transition:all .2s}
+    .toggle-group button.active{background:var(--clr-accent);color:#fff;border-color:var(--clr-accent)}
+
+    .tier-badge{display:inline-block;padding:2px 8px;border-radius:var(--radius-pill);font-size:.75rem;font-weight:600}
+    .tier-strong{background:#d5f5e3;color:#1a9850}
+    .tier-moderate{background:#fef3cd;color:#856404}
+    .tier-weak{background:#f8d7da;color:#d73027}
+    [data-theme="dark"] .tier-strong{background:rgba(26,152,80,.2);color:#66bb6a}
+    [data-theme="dark"] .tier-moderate{background:rgba(230,126,34,.2);color:#ffa726}
+    [data-theme="dark"] .tier-weak{background:rgba(215,48,39,.2);color:#ef5350}
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+    <span class="icon-sun" aria-hidden="true">&#9728;</span>
+    <span class="icon-moon" aria-hidden="true">&#9790;</span>
+  </button>
+
+  <div class="offline-badge" id="offlineBadge" role="status" aria-live="polite">Offline</div>
+
+  <div class="bg-orb orb-1" aria-hidden="true"></div>
+  <div class="bg-orb orb-2" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <main class="shell" id="main">
+    <header class="hero reveal">
+      <div class="hero-text">
+        <a href="index.html" class="back-link" aria-label="Back to main dashboard">&larr; Back to Dashboard</a>
+        <p class="kicker">ICU RCT Living Evidence Gap Map</p>
+        <h1>Hemodynamic Evidence Insights</h1>
+        <p class="lead">
+          Analytical overview of evidence gaps, temporal trends, study design quality,
+          and research priorities across <span id="heroMentions">36,639</span> hemodynamic
+          outcome mentions in <span id="heroStudies">20,750</span> ICU randomized trials.
+        </p>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-card">
+          <p class="meta-label">Dataset</p>
+          <div class="select-wrap">
+            <select id="datasetSelect" aria-label="Dataset selection">
+              <option value="broad">All ICU RCTs</option>
+              <option value="placebo">Placebo-arm subset</option>
+            </select>
+          </div>
+          <p class="meta-note">Switch updates all analyses.</p>
+        </div>
+        <div class="meta-card">
+          <p class="meta-label">Generated</p>
+          <p class="meta-value" id="generatedAt">Loading...</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Section 1: Executive Summary -->
+    <section class="section reveal" aria-label="Executive summary">
+      <div class="section-header">
+        <h2>Executive Summary</h2>
+        <p>Key evidence quality indicators computed from trial registry data.</p>
+      </div>
+      <div class="score-cards" id="scoreCards">
+        <div class="score-card" id="cardDensity">
+          <p class="score-label">Evidence Density</p>
+          <p class="score-value" id="valDensity">--</p>
+          <p class="score-sub">Hemo mentions per study (x10)</p>
+          <div class="score-bar" id="barDensity"></div>
+        </div>
+        <div class="score-card" id="cardPlacebo">
+          <p class="score-label">Placebo Coverage</p>
+          <p class="score-value" id="valPlacebo">--</p>
+          <p class="score-sub">% of hemo studies with placebo</p>
+          <div class="score-bar" id="barPlacebo"></div>
+        </div>
+        <div class="score-card" id="cardBalance">
+          <p class="score-label">Outcome Balance</p>
+          <p class="score-value" id="valBalance">--</p>
+          <p class="score-sub">Primary/secondary parity</p>
+          <div class="score-bar" id="barBalance"></div>
+        </div>
+        <div class="score-card" id="cardCompletion">
+          <p class="score-label">Completion Rate</p>
+          <p class="score-value" id="valCompletion">--</p>
+          <p class="score-sub">% trials completed</p>
+          <div class="score-bar" id="barCompletion"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Evidence Gap Matrix -->
+    <section class="section reveal" aria-label="Evidence gap matrix">
+      <div class="section-header">
+        <h2>Evidence Gap Matrix</h2>
+        <p>Placebo-controlled evidence coverage per hemodynamic parameter. Higher gap score = more research needed.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-gapMatrix"></div>
+        <div id="gapMatrixChart" class="plotly-chart" role="img" aria-label="Diverging bar chart of evidence gaps by hemodynamic parameter"></div>
+      </div>
+      <div class="insight-box" id="gapInsights"></div>
+    </section>
+
+    <!-- Section 3: Temporal Evolution -->
+    <section class="section reveal" aria-label="Temporal evolution">
+      <div class="section-header">
+        <h2>Temporal Evolution</h2>
+        <p>How hemodynamic research has evolved over time, with ICU milestone annotations.</p>
+      </div>
+      <div class="toggle-group" id="temporalToggles">
+        <button class="active" data-mode="absolute">Absolute</button>
+        <button data-mode="cumulative">Cumulative</button>
+        <button data-mode="proportion">Proportion</button>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-temporal"></div>
+        <div id="temporalChart" class="plotly-chart" role="img" aria-label="Multi-line temporal evolution of hemodynamic keywords"></div>
+      </div>
+      <div class="insight-box" id="temporalInsights"></div>
+    </section>
+
+    <!-- Section 4: Placebo Evidence Landscape -->
+    <section class="section reveal" aria-label="Placebo evidence landscape">
+      <div class="section-header">
+        <h2>Placebo Evidence Landscape</h2>
+        <p>Tiered assessment of placebo-controlled evidence strength for each hemodynamic parameter.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-placeboLand"></div>
+        <div id="placeboLandChart" class="plotly-chart" role="img" aria-label="Stacked bar chart of placebo evidence tiers"></div>
+      </div>
+      <div class="panel wide" style="margin-top:16px;overflow-x:auto">
+        <h3 style="margin:0 0 8px;font-size:1rem">Top Research Opportunities</h3>
+        <table class="priority-table" id="opportunityTable">
+          <thead><tr><th>Parameter</th><th>Total Studies</th><th>Placebo Studies</th><th>Placebo %</th><th>Tier</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 5: Study Design Profile -->
+    <section class="section reveal" aria-label="Study design profile">
+      <div class="section-header">
+        <h2>Study Design Profile</h2>
+        <p>Quality indicators: masking, phase, status, and enrollment distributions.</p>
+      </div>
+      <div class="chart-2x2">
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-masking"></div>
+          <div id="maskingChart" class="plotly-chart" role="img" aria-label="Masking distribution donut chart"></div>
+        </div>
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-phase"></div>
+          <div id="phaseChart" class="plotly-chart" role="img" aria-label="Phase distribution bar chart"></div>
+        </div>
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-status"></div>
+          <div id="statusChart" class="plotly-chart" role="img" aria-label="Trial status distribution bar chart"></div>
+        </div>
+        <div class="panel chart-container">
+          <div class="chart-toolbar" id="toolbar-enrollment"></div>
+          <div id="enrollmentChart" class="plotly-chart" role="img" aria-label="Enrollment size histogram"></div>
+        </div>
+      </div>
+      <div class="insight-box" id="designInsights"></div>
+    </section>
+
+    <!-- Section 6: Co-occurrence Network Insights -->
+    <section class="section reveal" aria-label="Co-occurrence insights">
+      <div class="section-header">
+        <h2>Co-occurrence Network Insights</h2>
+        <p>Which hemodynamic parameters are commonly measured together, revealing monitoring bundles.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-cooccur"></div>
+        <div id="cooccurChart" class="plotly-chart" role="img" aria-label="Co-occurrence heatmap of hemodynamic parameters"></div>
+      </div>
+      <div class="insight-box" id="cooccurInsights"></div>
+    </section>
+
+    <!-- Section 7: Research Priority Rankings -->
+    <section class="section reveal" aria-label="Research priority rankings">
+      <div class="section-header">
+        <h2>Research Priority Rankings</h2>
+        <p>Composite scoring to identify where the next ICU hemodynamic RCT should focus.</p>
+      </div>
+      <div class="panel wide chart-container">
+        <div class="chart-toolbar" id="toolbar-priority"></div>
+        <div id="priorityChart" class="plotly-chart" role="img" aria-label="Horizontal bar chart of research priority scores"></div>
+      </div>
+      <div class="panel wide" style="margin-top:16px;overflow-x:auto">
+        <table class="priority-table" id="priorityTable">
+          <thead><tr>
+            <th>Rank</th><th>Parameter</th><th>Composite</th>
+            <th>Gap (30%)</th><th>Relevance (25%)</th><th>Recency (20%)</th>
+            <th>Units (15%)</th><th>Primacy (10%)</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer" role="contentinfo">
+      <p>Hemodynamic Evidence Insights &mdash; built from ClinicalTrials.gov ICU RCT exports. Not prospectively registered.</p>
+    </footer>
+  </main>
+
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * UTILITIES (inlined from app.js / plotly_charts.js patterns)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const COLORS = {
+  accent: "#e2674a", accent2: "#2a5569", accent3: "#f4b36b",
+  paper: "#f7f1e7", ink: "#1b1a19", muted: "#6f5f52", teal: "#9ac2c7",
+};
+const CATEGORY = [
+  "#e2674a","#2a5569","#f4b36b","#9ac2c7","#c94444","#8e44ad",
+  "#27ae60","#326599","#e67e22","#7f8c8d","#2d8659","#d4956a",
+];
+const RdYlGn = [[0,"#d73027"],[0.25,"#fc8d59"],[0.5,"#fee08b"],[0.75,"#d9ef8b"],[1,"#1a9850"]];
+
+const isDark = () => document.documentElement.getAttribute("data-theme") === "dark";
+const getThemeColors = () => {
+  const d = isDark();
+  return {
+    paper: d ? "rgba(0,0,0,0)" : "rgba(255,255,255,0)",
+    plot: d ? "rgba(26,29,46,0.6)" : "rgba(255,255,255,0.6)",
+    text: d ? "#e8eaed" : COLORS.ink,
+    muted: d ? "#9aa0a6" : COLORS.muted,
+    gridColor: d ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+  };
+};
+const defaultLayout = (title) => {
+  const tc = getThemeColors();
+  return {
+    title: { text: title, font: { family: "Palatino Linotype, serif", size: 18, color: tc.text } },
+    paper_bgcolor: tc.paper, plot_bgcolor: tc.plot,
+    font: { family: "Palatino Linotype, serif", color: tc.text },
+    margin: { t: 50, b: 40, l: 50, r: 20 },
+  };
+};
+const defaultConfig = { responsive: true, displayModeBar: false };
+
+function safePlot(el, data, layout, config) {
+  if (el && el.data) Plotly.purge(el);
+  return Plotly.newPlot(el, data, layout, config);
+}
+
+function addExportToolbar(containerId) {
+  const toolbar = document.getElementById("toolbar-" + containerId);
+  if (!toolbar) return;
+  toolbar.innerHTML = "";
+  const mkBtn = (label, fmt) => {
+    const btn = document.createElement("button");
+    btn.className = "btn btn--ghost";
+    btn.textContent = label;
+    btn.style.cssText = "font-size:.75rem;padding:2px 8px;margin-right:4px";
+    btn.addEventListener("click", () => {
+      const el = document.getElementById(containerId + "Chart");
+      if (el) Plotly.downloadImage(el, { format: fmt, width: 1200, height: 700, scale: 2, filename: containerId });
+    });
+    toolbar.appendChild(btn);
+  };
+  mkBtn("PNG", "png");
+  mkBtn("SVG", "svg");
+}
+
+const animateCounter = (el, target, suffix, duration) => {
+  suffix = suffix || "";
+  duration = duration || 800;
+  const start = performance.now();
+  const isFloat = target % 1 !== 0;
+  const step = (now) => {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - (1 - p) * (1 - p);
+    const current = isFloat ? (target * eased).toFixed(1) : Math.floor(target * eased);
+    el.textContent = current + suffix;
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = (isFloat ? target.toFixed(1) : target) + suffix;
+  };
+  requestAnimationFrame(step);
+};
+
+/* RFC 4180 CSV parser (from app.js) */
+const parseCsv = (text) => {
+  const cleaned = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const rows = []; let row = []; let field = ""; let inQuotes = false;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (ch === "\r") continue;
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < cleaned.length && cleaned[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ",") { row.push(field); field = ""; }
+      else if (ch === "\n") { row.push(field); field = ""; rows.push(row); row = []; }
+      else { field += ch; }
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  if (rows.length === 0) return [];
+  const headers = rows[0];
+  return rows.slice(1).filter(r => r.length >= headers.length).map(values => {
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = values[idx] || ""; });
+    return obj;
+  });
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * DATA LOADING
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const datasetConfig = {
+  broad: { summary: "data/icu_hemodynamic_summary.json", map: "data/icu_hemodynamic_living_map.csv" },
+  placebo: { summary: "data/icu_hemodynamic_summary_placebo.json", map: "data/icu_hemodynamic_living_map_placebo.csv" },
+};
+
+const cache = {};
+let summary = null;
+let csvRows = [];
+
+async function loadDataset(key) {
+  if (cache[key]) { summary = cache[key].summary; csvRows = cache[key].rows; return; }
+  const cfg = datasetConfig[key];
+  const [sumResp, csvResp] = await Promise.all([fetch(cfg.summary), fetch(cfg.map)]);
+  summary = await sumResp.json();
+  const csvText = await csvResp.text();
+  csvRows = parseCsv(csvText);
+  cache[key] = { summary, rows: csvRows };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * DARK MODE
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function initDarkMode() {
+  const stored = localStorage.getItem("shahzaib_theme");
+  if (stored === "dark" || stored === "light") {
+    document.documentElement.setAttribute("data-theme", stored);
+  } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  const toggle = document.getElementById("themeToggle");
+  toggle.addEventListener("click", () => {
+    const dark = isDark();
+    const newTheme = dark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("shahzaib_theme", newTheme);
+    if (summary) renderAll();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 1: EXECUTIVE SUMMARY
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderScoreCards() {
+  const t = summary.totals;
+  const s = summary.status_stratification;
+
+  const density = Math.min(100, (t.total_hemo_mentions / t.total_studies) * 10);
+  const placebo = (t.studies_with_hemo_and_placebo / t.studies_with_hemo_mentions) * 100;
+
+  const ot = summary.outcome_types || [];
+  const primary = (ot.find(o => o.outcome_type === "primary") || {}).mention_count || 0;
+  const secondary = (ot.find(o => o.outcome_type === "secondary") || {}).mention_count || 0;
+  const balance = primary + secondary > 0 ? (1 - Math.abs(primary - secondary) / (primary + secondary)) * 100 : 0;
+
+  const totalStatuses = Object.values(s).reduce((a, b) => a + b, 0);
+  const completion = totalStatuses > 0 ? ((s.COMPLETED || 0) / totalStatuses) * 100 : 0;
+
+  const scores = [
+    { id: "Density", value: density, suffix: "", decimals: 1 },
+    { id: "Placebo", value: placebo, suffix: "%", decimals: 1 },
+    { id: "Balance", value: balance, suffix: "%", decimals: 1 },
+    { id: "Completion", value: completion, suffix: "%", decimals: 1 },
+  ];
+
+  scores.forEach(sc => {
+    const card = document.getElementById("card" + sc.id);
+    const valEl = document.getElementById("val" + sc.id);
+    const barEl = document.getElementById("bar" + sc.id);
+    const colorClass = sc.value >= 70 ? "score-green" : sc.value >= 40 ? "score-amber" : "score-red";
+    card.className = "score-card " + colorClass;
+    animateCounter(valEl, sc.value, sc.suffix, 1000);
+    barEl.style.width = Math.min(100, sc.value) + "%";
+  });
+
+  document.getElementById("heroMentions").textContent = t.total_hemo_mentions.toLocaleString();
+  document.getElementById("heroStudies").textContent = t.total_studies.toLocaleString();
+  document.getElementById("generatedAt").textContent = summary.generated_at
+    ? new Date(summary.generated_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+    : "Unknown";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 2: EVIDENCE GAP MATRIX
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderGapMatrix() {
+  const nk = [...summary.normalized_keywords].filter(k => k.study_count >= 10)
+    .map(k => ({ ...k, gap: 100 * (1 - k.placebo_study_count / k.study_count) }))
+    .sort((a, b) => b.gap - a.gap);
+
+  const tc = getThemeColors();
+  const layout = {
+    ...defaultLayout(""),
+    margin: { t: 20, b: 40, l: 180, r: 40 },
+    xaxis: { title: "Study count", gridcolor: tc.gridColor, zeroline: true, zerolinecolor: tc.gridColor },
+    yaxis: { autorange: "reversed", tickfont: { size: 11 } },
+    barmode: "relative",
+    showlegend: true,
+    legend: { orientation: "h", y: -0.15, x: 0.5, xanchor: "center" },
+    height: Math.max(400, nk.length * 28 + 80),
+  };
+
+  const data = [
+    {
+      type: "bar", orientation: "h", name: "Non-placebo studies",
+      y: nk.map(k => k.keyword), x: nk.map(k => -(k.study_count - k.placebo_study_count)),
+      marker: { color: COLORS.accent3 },
+      hovertemplate: "%{y}: %{customdata} non-placebo<extra></extra>",
+      customdata: nk.map(k => k.study_count - k.placebo_study_count),
+    },
+    {
+      type: "bar", orientation: "h", name: "Placebo studies",
+      y: nk.map(k => k.keyword), x: nk.map(k => k.placebo_study_count),
+      marker: { color: "#1a9850" },
+      text: nk.map(k => (100 - k.gap).toFixed(0) + "%"),
+      textposition: "outside", textfont: { size: 10 },
+      hovertemplate: "%{y}: %{x} placebo (" + "%{text})<extra></extra>",
+    },
+  ];
+
+  safePlot(document.getElementById("gapMatrixChart"), data, layout, defaultConfig);
+  addExportToolbar("gapMatrix");
+
+  const top3 = nk.filter(k => k.study_count >= 50).slice(0, 3);
+  const insightEl = document.getElementById("gapInsights");
+  insightEl.innerHTML = '<p class="insight-title">Key Evidence Gaps</p><ul>' +
+    top3.map(k => "<li><strong>" + k.keyword + "</strong>: " + k.study_count +
+      " studies but only " + k.placebo_study_count + " with placebo (" +
+      (100 - k.gap).toFixed(0) + "% coverage). Gap score: " + k.gap.toFixed(0) + "</li>").join("") +
+    "</ul>";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 3: TEMPORAL EVOLUTION
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+let temporalMode = "absolute";
+let yearKeywordData = null;
+
+function computeYearKeywordData() {
+  if (yearKeywordData) return yearKeywordData;
+
+  const top8 = [...summary.normalized_keywords]
+    .sort((a, b) => b.study_count - a.study_count).slice(0, 8).map(k => k.keyword);
+
+  const yearMap = {};
+  csvRows.forEach(row => {
+    const sd = row.start_date || "";
+    const yearMatch = sd.match(/(\d{4})/);
+    if (!yearMatch) return;
+    const year = parseInt(yearMatch[1], 10);
+    if (year < 1990 || year > new Date().getFullYear()) return;
+    const kw = row.normalized_keyword || "";
+    if (!top8.includes(kw)) return;
+    if (!yearMap[year]) yearMap[year] = {};
+    yearMap[year][kw] = (yearMap[year][kw] || 0) + 1;
+  });
+
+  const years = Object.keys(yearMap).map(Number).sort((a, b) => a - b);
+  yearKeywordData = { years, top8, yearMap };
+  return yearKeywordData;
+}
+
+function renderTemporal() {
+  const { years, top8, yearMap } = computeYearKeywordData();
+  const tc = getThemeColors();
+
+  const milestones = [
+    { year: 2001, label: "Rivers EGDT" },
+    { year: 2008, label: "SSC Update" },
+    { year: 2014, label: "ProCESS/ARISE" },
+    { year: 2016, label: "Sepsis-3" },
+    { year: 2020, label: "COVID-19" },
+  ];
+
+  const traces = top8.map((kw, i) => {
+    let yVals;
+    if (temporalMode === "absolute") {
+      yVals = years.map(yr => (yearMap[yr] || {})[kw] || 0);
+    } else if (temporalMode === "cumulative") {
+      let cum = 0;
+      yVals = years.map(yr => { cum += (yearMap[yr] || {})[kw] || 0; return cum; });
+    } else {
+      yVals = years.map(yr => {
+        const total = Object.values(yearMap[yr] || {}).reduce((s, v) => s + v, 0);
+        return total > 0 ? ((yearMap[yr] || {})[kw] || 0) / total * 100 : 0;
+      });
+    }
+    return {
+      type: "scatter", mode: "lines", name: kw,
+      x: years, y: yVals,
+      line: { color: CATEGORY[i % CATEGORY.length], width: 2 },
+      hovertemplate: kw + ": %{y" + (temporalMode === "proportion" ? ":.1f" : "") + "}<extra>%{x}</extra>",
+    };
+  });
+
+  const annotations = milestones.filter(m => years.includes(m.year)).map(m => ({
+    x: m.year, y: 1.05, xref: "x", yref: "paper",
+    text: m.label, showarrow: true, arrowhead: 2, ax: 0, ay: -25,
+    font: { size: 10, color: tc.muted }, arrowcolor: tc.muted,
+  }));
+
+  const layout = {
+    ...defaultLayout(""),
+    margin: { t: 30, b: 50, l: 60, r: 20 },
+    xaxis: { title: "Year", gridcolor: tc.gridColor, dtick: 5 },
+    yaxis: {
+      title: temporalMode === "proportion" ? "% of top-8 mentions" : "Mentions",
+      gridcolor: tc.gridColor,
+    },
+    legend: { orientation: "h", y: -0.25, x: 0.5, xanchor: "center" },
+    annotations: annotations,
+    height: 450,
+  };
+
+  safePlot(document.getElementById("temporalChart"), traces, layout, defaultConfig);
+  addExportToolbar("temporal");
+
+  // Insight: fastest growing in last 5 years
+  const currentYear = new Date().getFullYear();
+  const recentYears = years.filter(y => y >= currentYear - 5);
+  const olderYears = years.filter(y => y >= currentYear - 10 && y < currentYear - 5);
+  const growth = top8.map(kw => {
+    const recent = recentYears.reduce((s, yr) => s + ((yearMap[yr] || {})[kw] || 0), 0) / Math.max(1, recentYears.length);
+    const older = olderYears.reduce((s, yr) => s + ((yearMap[yr] || {})[kw] || 0), 0) / Math.max(1, olderYears.length);
+    const pct = older > 0 ? ((recent - older) / older) * 100 : 0;
+    return { kw, recent: recent.toFixed(0), older: older.toFixed(0), pct };
+  }).sort((a, b) => b.pct - a.pct);
+
+  const insightEl = document.getElementById("temporalInsights");
+  const fastest = growth[0];
+  const declining = growth.filter(g => g.pct < 0);
+  let html = '<p class="insight-title">5-Year Trends (' + (currentYear - 5) + '-' + currentYear + ' vs ' + (currentYear - 10) + '-' + (currentYear - 6) + ')</p><ul>';
+  html += "<li><strong>Fastest growing</strong>: " + fastest.kw + " (+" + fastest.pct.toFixed(0) + "% avg/year)</li>";
+  if (declining.length > 0) {
+    html += "<li><strong>Declining</strong>: " + declining.map(d => d.kw + " (" + d.pct.toFixed(0) + "%)").join(", ") + "</li>";
+  }
+  html += "<li>COVID-19 surge in 2020 drove a " +
+    ((((yearMap[2020] ? Object.values(yearMap[2020]).reduce((s, v) => s + v, 0) : 0) /
+       Math.max(1, (yearMap[2019] ? Object.values(yearMap[2019]).reduce((s, v) => s + v, 0) : 1))) - 1) * 100).toFixed(0) +
+    "% increase in hemodynamic outcome registrations</li>";
+  html += "</ul>";
+  insightEl.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 4: PLACEBO EVIDENCE LANDSCAPE
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderPlaceboLandscape() {
+  const nk = [...summary.normalized_keywords].sort((a, b) => b.study_count - a.study_count);
+  const strong = nk.filter(k => k.placebo_study_count >= 100);
+  const moderate = nk.filter(k => k.placebo_study_count >= 20 && k.placebo_study_count < 100);
+  const weak = nk.filter(k => k.placebo_study_count < 20);
+
+  const tc = getThemeColors();
+  const all = [...strong.map(k => ({ ...k, tier: "Strong" })),
+               ...moderate.map(k => ({ ...k, tier: "Moderate" })),
+               ...weak.map(k => ({ ...k, tier: "Weak" }))];
+
+  const tierColors = { Strong: "#1a9850", Moderate: "#e67e22", Weak: "#d73027" };
+  const traces = ["Strong", "Moderate", "Weak"].map(tier => {
+    const items = all.filter(k => k.tier === tier);
+    return {
+      type: "bar", orientation: "h", name: tier + " (" + items.length + ")",
+      y: items.map(k => k.keyword), x: items.map(k => k.placebo_study_count),
+      marker: { color: tierColors[tier] },
+      hovertemplate: "%{y}: %{x} placebo studies<extra>" + tier + "</extra>",
+    };
+  });
+
+  const allSorted = all.sort((a, b) => b.placebo_study_count - a.placebo_study_count);
+  const layout = {
+    ...defaultLayout(""),
+    margin: { t: 20, b: 40, l: 180, r: 20 },
+    xaxis: { title: "Placebo studies", gridcolor: tc.gridColor },
+    yaxis: { autorange: "reversed", categoryorder: "array", categoryarray: allSorted.map(k => k.keyword) },
+    barmode: "stack",
+    legend: { orientation: "h", y: -0.15, x: 0.5, xanchor: "center" },
+    height: Math.max(400, all.length * 24 + 80),
+  };
+
+  safePlot(document.getElementById("placeboLandChart"), traces, layout, defaultConfig);
+  addExportToolbar("placeboLand");
+
+  // Opportunity table: high study count but low placebo %
+  const opps = nk.filter(k => k.study_count >= 30)
+    .map(k => ({ ...k, pct: k.study_count > 0 ? (k.placebo_study_count / k.study_count * 100) : 0 }))
+    .sort((a, b) => a.pct - b.pct).slice(0, 10);
+
+  const tbody = document.querySelector("#opportunityTable tbody");
+  tbody.innerHTML = opps.map(k => {
+    const tierClass = k.placebo_study_count >= 100 ? "tier-strong" : k.placebo_study_count >= 20 ? "tier-moderate" : "tier-weak";
+    const tierLabel = k.placebo_study_count >= 100 ? "Strong" : k.placebo_study_count >= 20 ? "Moderate" : "Weak";
+    return "<tr><td>" + k.keyword + "</td><td>" + k.study_count.toLocaleString() +
+      "</td><td>" + k.placebo_study_count.toLocaleString() + "</td><td>" + k.pct.toFixed(1) +
+      '%</td><td><span class="tier-badge ' + tierClass + '">' + tierLabel + "</span></td></tr>";
+  }).join("");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 5: STUDY DESIGN PROFILE
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderDesignProfile() {
+  const tc = getThemeColors();
+
+  // Aggregate from CSV
+  const masking = {}; const phase = {}; const status = {};
+  const enrollBins = { "<50": 0, "50-100": 0, "100-500": 0, "500-1000": 0, ">1000": 0 };
+  const seen = new Set();
+
+  csvRows.forEach(row => {
+    const nct = row.nct_id;
+    if (seen.has(nct)) return;
+    seen.add(nct);
+
+    const m = row.masking || "NONE";
+    masking[m] = (masking[m] || 0) + 1;
+
+    const p = row.phase || "NA";
+    phase[p] = (phase[p] || 0) + 1;
+
+    const st = row.overall_status || "UNKNOWN";
+    status[st] = (status[st] || 0) + 1;
+
+    const enr = parseInt(row.enrollment_count, 10);
+    if (isFinite(enr)) {
+      if (enr < 50) enrollBins["<50"]++;
+      else if (enr < 100) enrollBins["50-100"]++;
+      else if (enr < 500) enrollBins["100-500"]++;
+      else if (enr < 1000) enrollBins["500-1000"]++;
+      else enrollBins[">1000"]++;
+    }
+  });
+
+  // 1) Masking donut
+  const maskLabels = Object.keys(masking).sort();
+  safePlot(document.getElementById("maskingChart"), [{
+    type: "pie", hole: 0.5,
+    labels: maskLabels, values: maskLabels.map(l => masking[l]),
+    marker: { colors: CATEGORY },
+    textinfo: "label+percent", textposition: "outside",
+    hovertemplate: "%{label}: %{value} studies (%{percent})<extra></extra>",
+  }], {
+    ...defaultLayout("Masking"), margin: { t: 50, b: 20, l: 20, r: 20 }, height: 340,
+    showlegend: false,
+  }, defaultConfig);
+  addExportToolbar("masking");
+
+  // 2) Phase bar
+  const phaseOrder = ["EARLY_PHASE1", "PHASE1", "PHASE1/PHASE2", "PHASE2", "PHASE2/PHASE3", "PHASE3", "PHASE4", "NA"];
+  const pLabels = phaseOrder.filter(p => phase[p]);
+  safePlot(document.getElementById("phaseChart"), [{
+    type: "bar", x: pLabels, y: pLabels.map(p => phase[p] || 0),
+    marker: { color: COLORS.accent2 },
+    hovertemplate: "%{x}: %{y} studies<extra></extra>",
+  }], {
+    ...defaultLayout("Phase"), margin: { t: 50, b: 60, l: 50, r: 20 }, height: 340,
+    xaxis: { tickangle: -30, gridcolor: tc.gridColor },
+    yaxis: { title: "Studies", gridcolor: tc.gridColor },
+  }, defaultConfig);
+  addExportToolbar("phase");
+
+  // 3) Status bar
+  const stKeys = Object.keys(status).sort((a, b) => status[b] - status[a]);
+  safePlot(document.getElementById("statusChart"), [{
+    type: "bar", x: stKeys, y: stKeys.map(k => status[k]),
+    marker: { color: stKeys.map(k =>
+      k === "COMPLETED" ? "#1a9850" : k === "RECRUITING" ? "#2a5569" :
+      k === "TERMINATED" ? "#d73027" : COLORS.accent3) },
+    hovertemplate: "%{x}: %{y} studies<extra></extra>",
+  }], {
+    ...defaultLayout("Status"), margin: { t: 50, b: 80, l: 50, r: 20 }, height: 340,
+    xaxis: { tickangle: -45, gridcolor: tc.gridColor },
+    yaxis: { title: "Studies", gridcolor: tc.gridColor },
+  }, defaultConfig);
+  addExportToolbar("status");
+
+  // 4) Enrollment histogram
+  const binKeys = ["<50", "50-100", "100-500", "500-1000", ">1000"];
+  safePlot(document.getElementById("enrollmentChart"), [{
+    type: "bar", x: binKeys, y: binKeys.map(k => enrollBins[k]),
+    marker: { color: COLORS.teal },
+    hovertemplate: "%{x}: %{y} studies<extra></extra>",
+  }], {
+    ...defaultLayout("Enrollment Size"), margin: { t: 50, b: 40, l: 50, r: 20 }, height: 340,
+    xaxis: { title: "Participants", gridcolor: tc.gridColor },
+    yaxis: { title: "Studies", gridcolor: tc.gridColor },
+  }, defaultConfig);
+  addExportToolbar("enrollment");
+
+  // Design quality insight
+  const totalStudies = seen.size;
+  const doubleBlindPct = totalStudies > 0 ? ((masking["DOUBLE"] || 0) + (masking["TRIPLE"] || 0) + (masking["QUADRUPLE"] || 0)) / totalStudies * 100 : 0;
+  const phase3PlusPct = totalStudies > 0 ? ((phase["PHASE3"] || 0) + (phase["PHASE4"] || 0)) / totalStudies * 100 : 0;
+  const completionPct = totalStudies > 0 ? (status["COMPLETED"] || 0) / totalStudies * 100 : 0;
+  const designScore = (doubleBlindPct * 0.4 + phase3PlusPct * 0.3 + completionPct * 0.3).toFixed(1);
+
+  document.getElementById("designInsights").innerHTML =
+    '<p class="insight-title">Design Quality Score: ' + designScore + '/100</p><ul>' +
+    "<li>Double-blind or higher: " + doubleBlindPct.toFixed(1) + "% of studies</li>" +
+    "<li>Phase 3+: " + phase3PlusPct.toFixed(1) + "% of studies</li>" +
+    "<li>Completed: " + completionPct.toFixed(1) + "% of studies</li>" +
+    "</ul>";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 6: CO-OCCURRENCE NETWORK INSIGHTS
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderCooccurrence() {
+  const cooc = summary.keyword_cooccurrence || [];
+  const tc = getThemeColors();
+
+  // Get unique keywords from co-occurrence pairs
+  const kwSet = new Set();
+  cooc.forEach(c => { kwSet.add(c.keyword_a); kwSet.add(c.keyword_b); });
+  const keywords = [...kwSet].sort();
+
+  // Build symmetric matrix
+  const n = keywords.length;
+  const matrix = Array.from({ length: n }, () => Array(n).fill(0));
+  const kwStudyCounts = {};
+  summary.normalized_keywords.forEach(k => { kwStudyCounts[k.keyword] = k.study_count; });
+
+  cooc.forEach(c => {
+    const i = keywords.indexOf(c.keyword_a);
+    const j = keywords.indexOf(c.keyword_b);
+    if (i >= 0 && j >= 0) { matrix[i][j] = c.shared_study_count; matrix[j][i] = c.shared_study_count; }
+  });
+
+  // Triangular: set upper triangle to null for cleaner display
+  const displayMatrix = matrix.map((row, i) => row.map((val, j) => j <= i ? val : null));
+  const textMatrix = displayMatrix.map((row, i) => row.map((val, j) => {
+    if (j > i) return "";
+    if (i === j) return kwStudyCounts[keywords[i]] ? kwStudyCounts[keywords[i]].toString() : "";
+    if (val === 0) return "";
+    return val.toString();
+  }));
+
+  // Set diagonal to study count
+  keywords.forEach((kw, i) => { displayMatrix[i][i] = kwStudyCounts[kw] || 0; });
+
+  const maxVal = Math.max(...cooc.map(c => c.shared_study_count));
+
+  safePlot(document.getElementById("cooccurChart"), [{
+    type: "heatmap",
+    x: keywords, y: keywords, z: displayMatrix,
+    text: textMatrix, texttemplate: "%{text}",
+    colorscale: RdYlGn,
+    hovertemplate: "%{x} + %{y}: %{z} shared studies<extra></extra>",
+    showscale: true,
+    colorbar: { title: "Shared<br>studies", titlefont: { size: 11 } },
+  }], {
+    ...defaultLayout(""),
+    margin: { t: 20, b: 120, l: 160, r: 60 },
+    xaxis: { tickangle: -45, tickfont: { size: 10 } },
+    yaxis: { tickfont: { size: 10 }, autorange: "reversed" },
+    height: Math.max(500, n * 40 + 150),
+  }, defaultConfig);
+  addExportToolbar("cooccur");
+
+  // Insights: top 5 bundles + Jaccard
+  const jaccardPairs = cooc.map(c => {
+    const cA = kwStudyCounts[c.keyword_a] || 1;
+    const cB = kwStudyCounts[c.keyword_b] || 1;
+    const jaccard = c.shared_study_count / (cA + cB - c.shared_study_count);
+    return { ...c, jaccard };
+  }).sort((a, b) => b.shared_study_count - a.shared_study_count);
+
+  const top5 = jaccardPairs.slice(0, 5);
+  const byJaccard = [...jaccardPairs].sort((a, b) => b.jaccard - a.jaccard).slice(0, 3);
+
+  // Find isolated keywords (appear in fewest pairs)
+  const pairCounts = {};
+  cooc.forEach(c => {
+    pairCounts[c.keyword_a] = (pairCounts[c.keyword_a] || 0) + 1;
+    pairCounts[c.keyword_b] = (pairCounts[c.keyword_b] || 0) + 1;
+  });
+  const allKw = summary.normalized_keywords.map(k => k.keyword);
+  const isolated = allKw.filter(k => !pairCounts[k] || pairCounts[k] <= 1).slice(0, 5);
+
+  document.getElementById("cooccurInsights").innerHTML =
+    '<p class="insight-title">Monitoring Bundles</p><ul>' +
+    top5.map(p => "<li><strong>" + p.keyword_a + " + " + p.keyword_b + "</strong>: " +
+      p.shared_study_count + " shared studies (Jaccard: " + p.jaccard.toFixed(2) + ")</li>").join("") +
+    '</ul><p class="insight-title" style="margin-top:10px">Highest Co-measurement Affinity (Jaccard)</p><ul>' +
+    byJaccard.map(p => "<li>" + p.keyword_a + " + " + p.keyword_b + ": J=" + p.jaccard.toFixed(3) + "</li>").join("") +
+    "</ul>" +
+    (isolated.length > 0 ? '<p class="insight-title" style="margin-top:10px">Isolated Parameters</p><p style="font-size:.85rem">' +
+      isolated.join(", ") + " &mdash; rarely co-measured with other parameters</p>" : "");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SECTION 7: RESEARCH PRIORITY RANKINGS
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderPriorityRankings() {
+  const nk = summary.normalized_keywords;
+  const maxMention = Math.max(...nk.map(k => k.mention_count));
+  const tc = getThemeColors();
+
+  // Per-keyword CSV aggregation for recency, units, primacy
+  const kwStats = {};
+  nk.forEach(k => { kwStats[k.keyword] = { recent: 0, total: 0, withUnit: 0, primary: 0, mentions: 0 }; });
+
+  csvRows.forEach(row => {
+    const kw = row.normalized_keyword;
+    if (!kwStats[kw]) return;
+    kwStats[kw].total++;
+    kwStats[kw].mentions++;
+
+    const sd = row.start_date || "";
+    const ym = sd.match(/(\d{4})/);
+    if (ym && parseInt(ym[1], 10) >= 2020) kwStats[kw].recent++;
+
+    if (row.normalized_unit && row.normalized_unit !== "" && row.normalized_unit !== "N/A") kwStats[kw].withUnit++;
+    if (row.outcome_type === "primary") kwStats[kw].primary++;
+  });
+
+  const ranked = nk.filter(k => k.study_count >= 10).map(k => {
+    const st = kwStats[k.keyword] || { recent: 0, total: 1, withUnit: 0, primary: 0, mentions: 1 };
+    const gap = 100 * (1 - k.placebo_study_count / Math.max(1, k.study_count));
+    const relevance = 100 * k.mention_count / maxMention;
+    const recency = st.total > 0 ? 100 * st.recent / st.total : 0;
+    const units = st.mentions > 0 ? 100 * st.withUnit / st.mentions : 0;
+    const primacy = st.mentions > 0 ? 100 * st.primary / st.mentions : 0;
+    const composite = gap * 0.30 + relevance * 0.25 + recency * 0.20 + units * 0.15 + primacy * 0.10;
+    return { keyword: k.keyword, composite, gap, relevance, recency, units, primacy };
+  }).sort((a, b) => b.composite - a.composite);
+
+  // Horizontal bar chart
+  const topN = ranked.slice(0, 20);
+  const maxComposite = Math.max(...topN.map(r => r.composite));
+
+  safePlot(document.getElementById("priorityChart"), [{
+    type: "bar", orientation: "h",
+    y: topN.map(r => r.keyword).reverse(),
+    x: topN.map(r => r.composite).reverse(),
+    marker: {
+      color: topN.map(r => r.composite).reverse(),
+      colorscale: [[0, "#1a9850"], [0.5, "#fee08b"], [1, "#d73027"]],
+      cmin: 0, cmax: maxComposite,
+    },
+    text: topN.map(r => r.composite.toFixed(1)).reverse(),
+    textposition: "outside", textfont: { size: 10 },
+    hovertemplate: "%{y}: %{x:.1f}<extra></extra>",
+  }], {
+    ...defaultLayout(""),
+    margin: { t: 20, b: 40, l: 180, r: 50 },
+    xaxis: { title: "Priority Score", gridcolor: tc.gridColor, range: [0, maxComposite * 1.15] },
+    yaxis: { tickfont: { size: 11 } },
+    height: Math.max(400, topN.length * 28 + 80),
+  }, defaultConfig);
+  addExportToolbar("priority");
+
+  // Full table
+  const tbody = document.querySelector("#priorityTable tbody");
+  tbody.innerHTML = ranked.map((r, i) =>
+    "<tr><td>" + (i + 1) + "</td><td><strong>" + r.keyword + "</strong></td>" +
+    "<td><strong>" + r.composite.toFixed(1) + "</strong></td>" +
+    "<td>" + r.gap.toFixed(0) + "</td><td>" + r.relevance.toFixed(0) + "</td>" +
+    "<td>" + r.recency.toFixed(0) + "</td><td>" + r.units.toFixed(0) + "</td>" +
+    "<td>" + r.primacy.toFixed(0) + "</td></tr>"
+  ).join("");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * ORCHESTRATION
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function renderAll() {
+  renderScoreCards();
+  renderGapMatrix();
+  renderTemporal();
+  renderPlaceboLandscape();
+  renderDesignProfile();
+  renderCooccurrence();
+  renderPriorityRankings();
+}
+
+function revealSections() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { rootMargin: "0px 0px -40px 0px" });
+  document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+}
+
+async function init() {
+  initDarkMode();
+
+  // Temporal mode toggles
+  document.getElementById("temporalToggles").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-mode]");
+    if (!btn) return;
+    document.querySelectorAll("#temporalToggles button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    temporalMode = btn.dataset.mode;
+    if (summary) renderTemporal();
+  });
+
+  // Dataset selector
+  const sel = document.getElementById("datasetSelect");
+  sel.addEventListener("change", async () => {
+    yearKeywordData = null;
+    await loadDataset(sel.value);
+    renderAll();
+  });
+
+  // Initial load
+  try {
+    await loadDataset(sel.value);
+    renderAll();
+  } catch (err) {
+    console.error("Failed to load data:", err);
+  }
+
+  revealSections();
+
+  // Offline badge
+  const badge = document.getElementById("offlineBadge");
+  const updateOnline = () => { badge.classList.toggle("is-visible", !navigator.onLine); };
+  window.addEventListener("online", updateOnline);
+  window.addEventListener("offline", updateOnline);
+  updateOnline();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

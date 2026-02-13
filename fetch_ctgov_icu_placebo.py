@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "ctgov_icu_placebo_strategy.json"
 
 _NCT_RE = re.compile(r"^NCT\d{8}$")
+# Module-level (needed for ctgov_config/ctgov_utils imports below).
+# validators.py has its own _get_tooling_root() for runtime use — intentional
+# duplication because import-time vs runtime resolution differ.
 TOOLING_ROOT = Path(
     os.environ.get("CTGOV_TOOLING_ROOT", ROOT.parent / "ctgov-search-strategies")
 )
@@ -230,6 +233,16 @@ def extract_study_fields(study: Dict) -> Dict[str, str]:
     else:
         phase_value = normalize_text(design.get("phase"))
 
+    # Extract countries from locations module
+    locations_module = protocol.get("contactsLocationsModule", {})
+    locations = locations_module.get("locations", []) or []
+    country_set: Set[str] = set()
+    for loc in locations:
+        country = normalize_text(loc.get("country"))
+        if country:
+            country_set.add(country)
+    countries_str = "; ".join(sorted(country_set))
+
     return {
         "nct_id": normalize_text(ident.get("nctId")),
         "brief_title": normalize_text(ident.get("briefTitle")),
@@ -262,6 +275,7 @@ def extract_study_fields(study: Dict) -> Dict[str, str]:
         ),
         "conditions": "; ".join(extract_list(conditions.get("conditions", []))),
         "keywords": "; ".join(extract_list(keywords)),
+        "countries": countries_str,
     }
 
 
@@ -324,6 +338,7 @@ def run_query(
     updated_since: Optional[str],
 ) -> Dict[str, int]:
     session = get_session(user_agent=DEFAULT_USER_AGENT)
+    query_text_base = query_term  # Original query from config (before date filter)
     if updated_since:
         query_term = (
             f"{query_term} AND AREA[LastUpdatePostDate]RANGE[{updated_since},MAX]"
@@ -364,6 +379,7 @@ def run_query(
             "placebo_arm_count",
             "outcome_count",
             "hemo_outcome_count",
+            "countries",
             "updated_since",
             "query_name",
         ],
@@ -441,7 +457,7 @@ def run_query(
                     if not _NCT_RE.match(nct_id):
                         continue
                     # Sanitize text fields against CSV formula injection (V-14)
-                    for key in ("brief_title", "official_title", "conditions", "keywords"):
+                    for key in ("brief_title", "official_title", "conditions", "keywords", "countries"):
                         fields[key] = _csv_safe(fields.get(key, ""))
                     arms = extract_arms(study)
                     outcomes = extract_outcomes(study)
@@ -544,6 +560,8 @@ def run_query(
 
     return {
         "search_date_utc": datetime.now(timezone.utc).isoformat(),
+        "query_text": query_text_base,
+        "query_text_executed": query_term,
         "total_count": total_count,
         "returned_count": total,
         "arm_rows": arm_rows,

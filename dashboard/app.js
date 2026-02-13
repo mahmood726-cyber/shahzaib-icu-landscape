@@ -672,7 +672,7 @@ const openSidebar = (nctId) => {
 
       const enrichBadges = document.createElement("div");
       enrichBadges.className = "sidebar-badges";
-      const allSources = ["PubMed", "OpenAlex", "FAERS", "Unpaywall", "Crossref", "OpenCitations", "WHO ICTRP"];
+      const allSources = ["PubMed", "OpenAlex", "FAERS", "Unpaywall", "Crossref", "OpenCitations"];
       allSources.forEach((src) => {
         const badge = document.createElement("span");
         const isActive = sources.includes(src);
@@ -1377,13 +1377,7 @@ const renderDetailSources = (nctId) => {
     linksDiv.appendChild(faersLine);
   }
 
-  const whoIds = trial.who_trial_id || [];
-  if (whoIds.length > 0) {
-    const whoLine = document.createElement("div");
-    whoLine.textContent = `WHO ICTRP: ${whoIds.join(", ")}`;
-    if (trial.who_countries) whoLine.textContent += ` \u2014 ${trial.who_countries}`;
-    linksDiv.appendChild(whoLine);
-  }
+
 };
 
 // ══════════════════════════════════════════════════════════════════════════════

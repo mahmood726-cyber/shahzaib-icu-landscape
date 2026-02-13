@@ -16,7 +16,7 @@ from sources.openalex_adapter import OpenAlexAdapter
 from sources.crossref_adapter import CrossrefAdapter
 from sources.opencitations_adapter import OpenCitationsAdapter
 from sources.unpaywall_adapter import UnpaywallAdapter
-from sources.who_ictrp_adapter import WHOICTRPAdapter
+
 from sources.openfda_adapter import OpenFDAAdapter
 
 ADAPTERS: Dict[str, type] = {
@@ -26,7 +26,7 @@ ADAPTERS: Dict[str, type] = {
     "crossref": CrossrefAdapter,
     "opencitations": OpenCitationsAdapter,
     "unpaywall": UnpaywallAdapter,
-    "who_ictrp": WHOICTRPAdapter,
+
     "openfda": OpenFDAAdapter,
 }
 
@@ -36,7 +36,7 @@ ADAPTERS: Dict[str, type] = {
 SOURCE_PHASES: Dict[str, int] = {
     "pubmed": 1,
     "europmc": 1,
-    "who_ictrp": 1,
+
     "openalex": 2,
     "crossref": 2,
     "opencitations": 2,
@@ -52,7 +52,7 @@ DEFAULT_BASE_URLS: Dict[str, str] = {
     "crossref": "https://api.crossref.org",
     "opencitations": "https://opencitations.net/index/coci/api/v1",
     "unpaywall": "https://api.unpaywall.org/v2",
-    "who_ictrp": "",
+
     "openfda": "https://api.fda.gov/drug/event.json",
 }
 

@@ -3,10 +3,10 @@
   "description": "ICU/critical care RCTs, with a placebo/sham/usual-care comparator; use query.term for CT.gov API v2.",
   "queries": {
     "icu_rct_broad": {
-      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU)"
+      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU)"
     },
     "icu_rct_placebo": {
-      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU) AND (placebo OR sham OR \"standard care\" OR \"usual care\")"
+      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU) AND (placebo OR sham OR \"standard care\" OR \"usual care\")"
     }
   },
   "notes": {
@@ -19,7 +19,8 @@
       "All study statuses included (recruiting, completed, withdrawn, terminated) — filter by status in downstream analysis",
       "Geographic bias toward US-centric and industry-sponsored trials due to CT.gov registration patterns"
     ],
-    "search_terms_added_v2": "ARDS, acute respiratory distress, respiratory failure, cardiogenic shock, hemorrhagic shock, ECMO, extracorporeal membrane oxygenation, multi-organ failure, organ dysfunction, CCU, MICU, SICU, PICU, NICU"
+    "search_terms_added_v2": "ARDS, acute respiratory distress, respiratory failure, cardiogenic shock, hemorrhagic shock, haemorrhagic shock (UK spelling), ECMO, extracorporeal membrane oxygenation, multi-organ failure, organ dysfunction, CCU, MICU, SICU, PICU, NICU",
+    "grey_literature_note": "ClinicalTrials.gov and PubMed are searched. Trials registered exclusively on EUCTR, ISRCTN, ANZCTR, ChiCTR, or other registries without PubMed publications are not captured."
   },
   "hemodynamic_keywords": [
     "hemodynamic",
@@ -121,5 +122,32 @@
     "tissue oxygenation",
     "StO2",
     "NIRS"
-  ]
+  ],
+  "recall_reference_standard": {
+    "description": "Verified CT.gov-registered ICU hemodynamic RCTs for search recall validation. All NCT IDs verified against ClinicalTrials.gov API 2026-02-08. Trials registered only on non-CT.gov registries (VASST, VANISH, LeoPARDS, ProMISe) are excluded — they are expected to be absent.",
+    "scope_note": "Covers septic shock (5), corticosteroids in sepsis (2), ARDS (1), and ECMO (1). Does not validate cardiogenic shock, hemorrhagic shock, or pediatric ICU coverage.",
+    "nct_ids": [
+      "NCT00510835",
+      "NCT00975793",
+      "NCT01149278",
+      "NCT00147004",
+      "NCT03078712",
+      "NCT00670254",
+      "NCT02338843",
+      "NCT00299650",
+      "NCT01470703"
+    ],
+    "trial_names": [
+      "ProCESS (NCT00510835) — protocolized care vs usual care in early septic shock",
+      "ARISE (NCT00975793) — EGDT vs usual care in septic shock (Australia)",
+      "SEPSISPAM (NCT01149278) — MAP 65-70 vs 80-85 mmHg targets in septic shock",
+      "CORTICUS (NCT00147004) — hydrocortisone vs placebo in septic shock",
+      "ANDROMEDA-SHOCK (NCT03078712) — CRT vs lactate-guided resuscitation in septic shock",
+      "HYPRESS (NCT00670254) — hydrocortisone for prevention of septic shock",
+      "ATHOS-3 (NCT02338843) — angiotensin II in catecholamine-resistant vasodilatory shock",
+      "ACURASYS (NCT00299650) — cisatracurium in early severe ARDS",
+      "EOLIA (NCT01470703) — ECMO in severe ARDS"
+    ],
+    "verified_utc": "2026-02-08T13:55:00Z"
+  }
 }
