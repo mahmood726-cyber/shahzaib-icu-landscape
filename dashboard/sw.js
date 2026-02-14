@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * sw.js — Service Worker for ICU Living Evidence Map (offline support)
+ * sw.js — Service Worker for ICU Living Trial Landscape (offline support)
  *
  * Strategy: Network-first for data files, cache-first for static assets.
  * ────────────────────────────────────────────────────────────────────────── */

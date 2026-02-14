@@ -1,0 +1,3 @@
+# ICU Living Trial Landscape — Python dependencies
+# Core pipeline uses stdlib only, but ctgov-search-strategies tooling requires:
+requests>=2.28

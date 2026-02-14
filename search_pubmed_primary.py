@@ -151,13 +151,18 @@ def _eutils_get(
 
 def _build_pubmed_query(config: Dict[str, Any]) -> str:
     """Build PubMed search query for ICU RCTs with hemodynamic outcomes."""
-    # ICU terms
+    # ICU terms — harmonized with CT.gov query (ctgov_icu_placebo_strategy.json v4)
     icu_terms = [
         '"intensive care"', '"critical care"', '"ICU"',
         '"septic shock"', '"sepsis"', '"vasopressor"',
         '"mechanical ventilation"', '"respiratory failure"',
         '"cardiogenic shock"', '"hemorrhagic shock"',
         '"ARDS"', '"ECMO"', '"organ dysfunction"',
+        '"traumatic brain injury"', '"cardiac arrest"',
+        '"targeted temperature management"', '"therapeutic hypothermia"',
+        '"major burns"', '"burn resuscitation"',
+        '"pulmonary embolism"', '"diabetic ketoacidosis"',
+        '"acute liver failure"', '"status epilepticus"',
     ]
     icu_group = " OR ".join(icu_terms)
 

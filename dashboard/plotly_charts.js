@@ -1,8 +1,8 @@
 /**
- * PlotlyCharts — 12 interactive Plotly.js visualizations for the ICU Living Evidence Map.
+ * PlotlyCharts — 12 interactive Plotly.js visualizations for the ICU Living Trial Landscape.
  *
  * 7 original charts (treemap, heatmap, timeseries, choropleth, sunburst, PRISMA-S, co-occurrence)
- * + 5 new charts (bubble matrix, forest plot, sankey, radar, force network)
+ * + 5 new charts (bubble matrix, keyword signal bars, sankey, radar, force network)
  * + chart export toolbar + dark mode awareness + FilterState integration.
  */
 /* eslint-disable no-unused-vars */
@@ -405,7 +405,7 @@ const PlotlyCharts = (() => {
         <text x="495" y="376" ${smallStyle}>${formatNumber(hemoPlacebo)} trials</text>
         <line x1="300" y1="320" x2="220" y2="335" ${arrowStyle} />
         <line x1="420" y1="320" x2="495" y2="335" ${arrowStyle} />
-        <text x="360" y="420" ${smallStyle} font-style="italic">Adapted PRISMA-S flow for evidence gap mapping. Not a full PRISMA 2020 diagram.</text>
+        <text x="360" y="420" ${smallStyle} font-style="italic">Adapted PRISMA-S flow for trial landscape mapping. Not a full PRISMA 2020 diagram.</text>
       </svg>`;
   }
 
@@ -658,24 +658,25 @@ const PlotlyCharts = (() => {
         studyCount: d.studies.size,
         placeboCount: d.placebo.size,
         mentions: d.mentions,
-        // I² proxy: mentions/studies ratio — higher ratio = more heterogeneous measurement
-        heterogeneity: d.studies.size > 0 ? d.mentions / d.studies.size : 0,
+        // Measurement density: mentions per study — NOT a statistical heterogeneity measure (I²/tau²)
+        measureDensity: d.studies.size > 0 ? d.mentions / d.studies.size : 0,
       }))
       .filter((d) => d.studyCount >= 2)
       .sort((a, b) => b.studyCount - a.studyCount)
       .slice(0, 20);
 
-    if (sorted.length === 0) { el.textContent = "Insufficient data for forest plot."; return; }
+    if (sorted.length === 0) { el.textContent = "Insufficient data for keyword signal bars."; return; }
 
     const tc = getThemeColors();
     const keywords = sorted.map((d) => d.keyword);
     const studyCounts = sorted.map((d) => d.studyCount);
     const maxCount = Math.max(...studyCounts, 1);
 
-    // I² color: green < 25%, yellow 25-75%, red > 75% (normalized as mentions/study ratio)
-    const maxHet = Math.max(...sorted.map((d) => d.heterogeneity), 1);
+    // Measurement density color: green = low density, amber = medium, red = high density
+    // This is NOT statistical heterogeneity (I²/tau²) — it reflects mentions per study only
+    const maxDensity = Math.max(...sorted.map((d) => d.measureDensity), 1);
     const barColors = sorted.map((d) => {
-      const ratio = d.heterogeneity / maxHet;
+      const ratio = d.measureDensity / maxDensity;
       if (ratio < 0.33) return "#388e3c";
       if (ratio < 0.67) return "#f57c00";
       return "#d32f2f";

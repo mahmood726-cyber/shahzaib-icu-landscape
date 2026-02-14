@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="ICU RCT Living Evidence Gap Map — interactive dashboard of critical care randomized trials with hemodynamic and related ICU outcomes." />
-  <title>Hemodynamic Evidence Map</title>
+  <meta name="description" content="ICU RCT Living Trial Landscape Map — interactive dashboard of registered critical care randomized trials with hemodynamic and related ICU outcomes." />
+  <title>ICU Hemodynamic Trial Landscape</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="lib/plotly.min.js" defer></script>
 </head>
@@ -37,12 +37,14 @@
   <main class="shell" id="main" tabindex="-1">
     <header class="hero reveal">
       <div class="hero-text">
-        <p class="kicker">ICU RCT Living Evidence Gap Map</p>
-        <h1>Hemodynamic Evidence Map</h1>
+        <p class="kicker">ICU RCT Living Trial Landscape Map</p>
+        <h1>Hemodynamic Trial Landscape</h1>
         <p class="lead">
-          A living evidence gap map of critical care randomized trials with hemodynamic
-          and related ICU outcomes, highlighting placebo-arm signals and outcome patterns.
+          A living landscape map of registered critical care randomized trials with hemodynamic
+          and related ICU outcomes, based on ClinicalTrials.gov and PubMed. Highlights
+          placebo-arm coverage and outcome registration patterns.
           Scope includes adult, pediatric, and neonatal ICU populations.
+          <strong>Note:</strong> This maps trial registrations, not published results or effect sizes.
         </p>
         <!-- Global search -->
         <div class="global-search">
@@ -214,22 +216,22 @@
       </div>
     </section>
 
-    <!-- NEW: Interactive Forest Plot -->
-    <section class="section reveal" aria-label="Forest plot">
+    <!-- Keyword signal bar chart (formerly "forest plot" — renamed to avoid confusion with meta-analytic forest plots) -->
+    <section class="section reveal" aria-label="Keyword signal bars">
       <div class="section-header">
-        <h2>Keyword evidence forest</h2>
-        <p>Study count and evidence strength per hemodynamic keyword. Click keywords to expand individual studies.</p>
+        <h2>Keyword signal bars</h2>
+        <p>Study count per hemodynamic keyword. Bar color reflects within-keyword variability in study designs (exploratory, not a statistical heterogeneity measure). Click keywords to expand.</p>
       </div>
       <div class="panel wide chart-container">
         <div class="chart-toolbar" id="toolbar-forestPlot"></div>
-        <div id="forestPlotChart" class="plotly-chart" role="img" aria-label="Forest plot showing evidence per hemodynamic keyword"></div>
+        <div id="forestPlotChart" class="plotly-chart" role="img" aria-label="Bar chart showing study count per hemodynamic keyword"></div>
       </div>
     </section>
 
     <section class="section reveal" aria-label="Interactive visualizations">
       <div class="section-header">
         <h2>Interactive visualizations</h2>
-        <p>Explore the evidence map through interactive charts. Hover for details, click to filter.</p>
+        <p>Explore the trial landscape through interactive charts. Hover for details, click to filter.</p>
       </div>
 
       <!-- NEW: Sankey + Radar -->
@@ -410,24 +412,69 @@
         <p>Search strategy, classification, and known limitations.</p>
       </div>
       <div class="panel wide">
-        <h3>Search strategy</h3>
+        <h3>Rationale and objectives</h3>
         <p class="note">
-          Trials are retrieved from ClinicalTrials.gov (CT.gov) via the <strong>API v2</strong>
-          using free-text <code>query.term</code> queries filtered by
-          <code>AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED</code>.
+          This living trial landscape map aims to characterize the scope, coverage, and temporal
+          trends of registered ICU randomized trials with hemodynamic and related outcomes.
+          The objective is descriptive: to identify which hemodynamic parameters are well-represented
+          in trial registrations and where placebo-controlled evidence is sparse.
+          This is not a systematic review and does not synthesize treatment effects.
+        </p>
+
+        <h3>Eligibility criteria</h3>
+        <p class="note">
+          <strong>Inclusion:</strong> Interventional, randomized studies registered on ClinicalTrials.gov
+          with at least one ICU/critical care population term and at least one hemodynamic keyword
+          in registered outcome measures.<br>
+          <strong>Exclusion:</strong> Observational studies, non-randomized designs, and trials
+          without any hemodynamic keyword match are excluded from the hemodynamic subset.
+          No date, language, or geographic restrictions.
+        </p>
+
+        <h3>Information sources</h3>
+        <p class="note">
+          <strong>Primary:</strong> ClinicalTrials.gov API v2 (all study statuses, no date restriction).<br>
+          <strong>Supplementary:</strong> PubMed E-utilities (esearch + efetch) for published RCTs
+          that may lack CT.gov registration. PubMed results are deduplicated against CT.gov via
+          NCT ID cross-referencing and Levenshtein fuzzy title matching (threshold 0.85).<br>
+          <strong>Enrichment sources (8):</strong> PubMed abstract, FAERS safety signals,
+          OpenAlex citation data, journal metadata, author affiliations, MeSH terms,
+          open access status, and related articles.
+        </p>
+
+        <h3>CT.gov search strategy</h3>
+        <p class="note">
+          Trials are retrieved via the <strong>API v2</strong> using free-text <code>query.term</code>
+          queries filtered by <code>AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED</code>.
           ICU/critical care terms include: intensive care, critical care, ICU, ARDS, ECMO,
           septic shock, vasopressor, mechanical ventilation, respiratory failure, cardiogenic shock,
-          hemorrhagic shock, organ dysfunction, CCU, MICU, SICU, PICU, NICU, and related synonyms.
-          No date range restriction is applied. Page size: 1000 records. No MeSH structured queries
+          hemorrhagic shock, organ dysfunction, TBI, cardiac arrest, targeted temperature management,
+          therapeutic hypothermia, major burns, pulmonary embolism, DKA, acute liver failure,
+          status epilepticus, CCU, MICU, SICU, PICU, NICU, and related synonyms.
+          Page size: 1000 records. No MeSH structured queries
           (CT.gov API v2 does not support <code>AREA[ConditionSearch]</code> with MeSH).
-          The search date is recorded in the summary JSON for PRISMA-S compliance.
+          The search date is recorded in the summary JSON.
+          Full query available in <code>ctgov_icu_placebo_strategy.json</code>.
         </p>
+
+        <h3>PubMed search strategy</h3>
+        <p class="note">
+          PubMed is searched using E-utilities with ICU terms harmonized to the CT.gov query,
+          combined with hemodynamic outcome terms, filtered to <code>Randomized Controlled Trial[pt]</code>.
+          Results are merged with the CT.gov dataset; studies with matching NCT IDs are deduplicated.
+          PubMed-only studies are flagged with <code>INFERRED_COMPLETED</code> status
+          and <code>INFERRED_RANDOMIZED</code> allocation (not independently verified).
+          PubMed introduces a temporal bias toward published (completed) trials and may
+          under-represent recently registered, not-yet-published studies.
+        </p>
+
         <h3>Population scope</h3>
         <p class="note">
           The search includes adult, pediatric (PICU), and neonatal (NICU) intensive care populations.
           Hemodynamic physiology differs across age groups; users should filter by condition
           text if age-specific analyses are needed. No age-based exclusion criteria are applied.
         </p>
+
         <h3>Hemodynamic outcome classification</h3>
         <p class="note">
           Outcome measures, descriptions, and time frames are scanned for hemodynamic keywords
@@ -438,15 +485,26 @@
           <strong>Non-hemodynamic adjuncts</strong> (ICU severity scores, ventilation duration,
           resuscitation endpoints) are included for clinical relevance but are reported separately
           from core hemodynamic totals to avoid inflating evidence counts.
-          Classification accuracy (sensitivity/specificity) has not been formally validated
-          against a manual screening gold standard.
+          Classification accuracy (sensitivity/specificity) has not been formally validated;
+          a validation framework with stratified sampling is provided in <code>validate_classification.py</code>.
         </p>
+
+        <h3>Data charting and items</h3>
+        <p class="note">
+          Extracted data items per trial: NCT ID, title, conditions, interventions, study status,
+          phase, enrollment, start date, completion date, allocation, masking, arm descriptions,
+          primary/secondary/other outcome measures with time frames, countries, and comparator type.
+          Charting is fully automated from structured API fields; no manual data extraction is performed.
+          Data dictionary available in the pipeline source code (<code>build_living_map.py</code>).
+        </p>
+
         <h3>Comparator arm classification</h3>
         <p class="note">
           "Placebo/sham" refers to true inert comparators only. Usual care and standard care
           are classified separately as active comparators. The structured CT.gov <code>armGroupType</code>
           field is used when available; text-based classification is the fallback.
         </p>
+
         <h3>Study status handling</h3>
         <p class="note">
           All study statuses are included (recruiting, completed, withdrawn, terminated, suspended).
@@ -454,18 +512,46 @@
           outcomes but never collected data. Status stratification is provided in the summary JSON.
           Users should consider filtering by status for quantitative analyses.
         </p>
+
+        <h3>Living review specification</h3>
+        <p class="note">
+          This trial landscape map follows a living review model with automated updates.
+          <strong>Update frequency:</strong> Monthly incremental updates via <code>living_update.py</code>,
+          fetching new/updated trials from CT.gov and PubMed since the last successful run.
+          <strong>Stopping criteria:</strong> Updates will continue as long as the CT.gov API remains
+          available and the dashboard is actively maintained. Cessation will be documented with a
+          final update date and reason.
+          <strong>Amendment policy:</strong> Changes to the search strategy, classification rules,
+          or enrichment sources are versioned in <code>ctgov_icu_placebo_strategy.json</code>
+          and documented in the pipeline commit history. Major amendments (e.g., adding new
+          population terms) trigger a full rebuild via <code>--force-full</code>.
+          <strong>Version history:</strong> Each update cycle is logged in <code>living_log.jsonl</code>
+          with timestamp, source counts, and TruthCert provenance hash.
+        </p>
+
         <h3>Limitations</h3>
         <ul class="note">
           <li>ClinicalTrials.gov only &mdash; trials registered solely on other registries (EUCTR, ISRCTN, ANZCTR, ChiCTR) are not captured.</li>
-          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality. Sensitivity/specificity not formally assessed.</li>
+          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality. A validation sample is provided but not yet scored.</li>
           <li>ICU severity scores (SOFA, APACHE) are composite indices; only the cardiovascular subscore is hemodynamic. Reported as adjuncts.</li>
           <li>Ventilator-free days and mechanical ventilation duration are respiratory outcomes, included as adjuncts for clinical context.</li>
           <li>Counts are mention-level by default (one study with 3 MAP time points = 3 mentions). Toggle to study-level in the signal map.</li>
           <li>Geographic bias: CT.gov over-represents US-centric and industry-sponsored trials.</li>
           <li>No risk of bias / quality appraisal is performed (masking and allocation data are extracted but not synthesized).</li>
-          <li>This evidence gap map is not prospectively registered (PROSPERO/OSF).</li>
-          <li>Adapted PRISMA flow &mdash; not a full PRISMA 2020 flow diagram.</li>
+          <li>This trial landscape map is not yet prospectively registered. Protocol registration on OSF Registries is planned.</li>
+          <li>Adapted PRISMA flow &mdash; not a full PRISMA 2020 flow diagram. Full PRISMA-ScR checklist available on request.</li>
+          <li>PubMed search introduces temporal bias toward published (completed) trials.</li>
+          <li>Deduplication uses fuzzy title matching (Levenshtein &ge; 0.85); false merges are possible. Validation sample planned.</li>
         </ul>
+
+        <h3>Ethics statement</h3>
+        <p class="note">
+          This study uses only publicly available trial registration metadata from ClinicalTrials.gov
+          and PubMed article metadata. No individual patient data, protected health information,
+          or restricted-access datasets are used. Ethical approval was not required as no human
+          subjects research was conducted.
+        </p>
+
         <h3>Technical notes</h3>
         <p class="note">
           If you open this file directly and charts are empty, run a local server from
@@ -475,7 +561,7 @@
     </section>
 
     <footer class="footer" role="contentinfo">
-      <p>Built from ClinicalTrials.gov ICU RCT exports. Not prospectively registered.</p>
+      <p>Built from ClinicalTrials.gov and PubMed. Maps trial registrations, not published effect sizes. Protocol registration pending.</p>
     </footer>
   </main>
 

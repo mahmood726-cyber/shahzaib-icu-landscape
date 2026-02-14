@@ -1,12 +1,12 @@
-# CLAUDE.md — Shahzaib ICU Living Evidence Map
+# CLAUDE.md — Shahzaib ICU Living Trial Landscape
 
 ## Project Overview
-CT.gov ICU RCT living evidence map: **fetch → enrich → build → dashboard** pipeline. Fetches clinical trials from ClinicalTrials.gov, enriches with PubMed/FAERS/OpenAlex data, builds a structured evidence map, and renders an interactive dashboard.
+CT.gov ICU RCT living trial landscape map: **fetch → enrich → build → dashboard** pipeline. Fetches clinical trials from ClinicalTrials.gov, enriches with PubMed/FAERS/OpenAlex data, builds a structured trial landscape, and renders an interactive dashboard.
 
 ## Pipeline Steps
 1. **Fetch**: CT.gov API search for ICU RCTs → raw JSON
 2. **Enrich**: 8 sources (PubMed, FAERS, OpenAlex, etc.) → enriched records
-3. **Build**: Aggregate, categorize, validate → structured evidence map
+3. **Build**: Aggregate, categorize, validate → structured trial landscape
 4. **Dashboard**: Interactive HTML with filters, bar charts, PRISMA flow
 
 ## Critical Warnings

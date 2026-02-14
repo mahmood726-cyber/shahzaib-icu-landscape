@@ -71,8 +71,7 @@ def load_config(config_path: Path) -> Dict[str, Any]:
     if env_email:
         cfg["email"] = env_email
 
-    # Warn if email is empty — polite-pool APIs (Unpaywall, Crossref, OpenAlex)
-    # will use default rate-limited endpoints or may reject requests
+    # Enforce email for polite-pool APIs (Unpaywall requires it; Crossref/OpenAlex recommended)
     if not cfg.get("email"):
         polite_pool_sources = {"unpaywall", "crossref", "openalex"}
         enabled_polite = [
@@ -80,11 +79,23 @@ def load_config(config_path: Path) -> Dict[str, Any]:
             if sc.get("enabled", True) and s in polite_pool_sources
         ]
         if enabled_polite:
-            print(
-                f"Warning: no email configured for polite-pool APIs ({', '.join(enabled_polite)}). "
-                "Set ENRICHMENT_EMAIL env var or 'email' in config for higher rate limits.",
-                file=sys.stderr,
-            )
+            # Unpaywall requires email — disable it if no email provided
+            unpaywall_cfg = cfg.get("sources", {}).get("unpaywall", {})
+            if unpaywall_cfg.get("enabled", True):
+                print(
+                    "Warning: Unpaywall requires email — disabling unpaywall source. "
+                    "Set ENRICHMENT_EMAIL env var or 'email' in config.",
+                    file=sys.stderr,
+                )
+                unpaywall_cfg["enabled"] = False
+            # Warn for other polite-pool sources
+            others = [s for s in enabled_polite if s != "unpaywall"]
+            if others:
+                print(
+                    f"Warning: no email for polite-pool APIs ({', '.join(others)}). "
+                    "Set ENRICHMENT_EMAIL for higher rate limits.",
+                    file=sys.stderr,
+                )
 
     return cfg
 

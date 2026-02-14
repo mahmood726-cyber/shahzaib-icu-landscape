@@ -3,10 +3,10 @@
   "description": "ICU/critical care RCTs, with a placebo/sham/usual-care comparator; use query.term for CT.gov API v2.",
   "queries": {
     "icu_rct_broad": {
-      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU)"
+      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU OR \"traumatic brain injury\" OR TBI OR \"cardiac arrest\" OR \"post-cardiac arrest\" OR \"targeted temperature management\" OR \"therapeutic hypothermia\" OR \"major burns\" OR \"burn resuscitation\" OR \"major trauma\" OR \"pulmonary embolism\" OR \"diabetic ketoacidosis\" OR DKA OR \"acute liver failure\" OR \"status epilepticus\")"
     },
     "icu_rct_placebo": {
-      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU) AND (placebo OR sham OR \"standard care\" OR \"usual care\")"
+      "query.term": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU OR \"traumatic brain injury\" OR TBI OR \"cardiac arrest\" OR \"post-cardiac arrest\" OR \"targeted temperature management\" OR \"therapeutic hypothermia\" OR \"major burns\" OR \"burn resuscitation\" OR \"major trauma\" OR \"pulmonary embolism\" OR \"diabetic ketoacidosis\" OR DKA OR \"acute liver failure\" OR \"status epilepticus\") AND (placebo OR sham OR \"standard care\" OR \"usual care\")"
     }
   },
   "notes": {
@@ -20,7 +20,8 @@
       "Geographic bias toward US-centric and industry-sponsored trials due to CT.gov registration patterns"
     ],
     "search_terms_added_v2": "ARDS, acute respiratory distress, respiratory failure, cardiogenic shock, hemorrhagic shock, haemorrhagic shock (UK spelling), ECMO, extracorporeal membrane oxygenation, multi-organ failure, organ dysfunction, CCU, MICU, SICU, PICU, NICU",
-    "known_gaps_v3": "TBI/traumatic brain injury, post-cardiac arrest, targeted temperature management, DKA, burns/major trauma, acute liver failure, hepatorenal syndrome, pulmonary embolism, status epilepticus — not yet in search query",
+    "search_terms_added_v4": "traumatic brain injury, TBI, cardiac arrest, post-cardiac arrest, targeted temperature management, therapeutic hypothermia, major burns, burn resuscitation, major trauma, pulmonary embolism, diabetic ketoacidosis, DKA, acute liver failure, status epilepticus",
+    "known_gaps_v4": "hepatorenal syndrome, post-resuscitation care (broader than cardiac arrest), polytrauma scoring (ISS/AIS-based), extracorporeal liver support — not yet in search query",
     "negative_context_v3": "MAP (excludes MAP kinase/MAPK), EF (excludes elongation/enhancement factor), HR (excludes hazard ratio, sHR, csHR, Cox HR), SV (excludes SV40), PAP (excludes Pap smear), perfusion (excludes cerebral/myocardial perfusion imaging)",
     "grey_literature_note": "ClinicalTrials.gov and PubMed are searched. Trials registered exclusively on EUCTR, ISRCTN, ANZCTR, ChiCTR, or other registries without PubMed publications are not captured."
   },
@@ -132,8 +133,8 @@
     "NIRS"
   ],
   "recall_reference_standard": {
-    "description": "Verified CT.gov-registered ICU hemodynamic RCTs for search recall validation. All NCT IDs verified against ClinicalTrials.gov API 2026-02-08. Trials registered only on non-CT.gov registries (VASST, VANISH, LeoPARDS, ProMISe) are excluded — they are expected to be absent.",
-    "scope_note": "Covers septic shock (5), corticosteroids in sepsis (2), ARDS (1), and ECMO (1). Does not validate cardiogenic shock, hemorrhagic shock, or pediatric ICU coverage.",
+    "description": "Verified CT.gov-registered ICU hemodynamic RCTs for search recall validation. All NCT IDs verified against ClinicalTrials.gov API. Trials registered only on non-CT.gov registries (VASST, VANISH, LeoPARDS, ProMISe) are excluded — they are expected to be absent.",
+    "scope_note": "Covers septic shock (5), corticosteroids in sepsis (2), ARDS (2), ECMO (1), post-cardiac arrest/TTM (2), TBI (2), pulmonary embolism (1), burns (1). Does not validate cardiogenic shock, hemorrhagic shock, DKA, or hepatorenal syndrome coverage.",
     "nct_ids": [
       "NCT00510835",
       "NCT00975793",
@@ -143,7 +144,13 @@
       "NCT00670254",
       "NCT02338843",
       "NCT00299650",
-      "NCT01470703"
+      "NCT01470703",
+      "NCT02908308",
+      "NCT00878644",
+      "NCT00155987",
+      "NCT00316004",
+      "NCT04430569",
+      "NCT05069922"
     ],
     "trial_names": [
       "ProCESS (NCT00510835) — protocolized care vs usual care in early septic shock",
@@ -154,9 +161,15 @@
       "HYPRESS (NCT00670254) — hydrocortisone for prevention of septic shock",
       "ATHOS-3 (NCT02338843) — angiotensin II in catecholamine-resistant vasodilatory shock",
       "ACURASYS (NCT00299650) — cisatracurium in early severe ARDS",
-      "EOLIA (NCT01470703) — ECMO in severe ARDS"
+      "EOLIA (NCT01470703) — ECMO in severe ARDS",
+      "TTM2 (NCT02908308) — targeted hypothermia vs normothermia after out-of-hospital cardiac arrest",
+      "THAPCA-OH (NCT00878644) — therapeutic hypothermia after pediatric cardiac arrest",
+      "DECRA (NCT00155987) — early decompressive craniectomy in severe TBI",
+      "Hypertonic-TBI (NCT00316004) — hypertonic saline resuscitation in severe TBI",
+      "PEITHO-3 (NCT04430569) — reduced-dose alteplase vs placebo in intermediate high-risk PE",
+      "Burns-FFP (NCT05069922) — FFP vs albumin in acute burn resuscitation"
     ],
-    "version": "1.0",
-    "verified_utc": "2026-02-08T13:55:00Z"
+    "version": "2.0",
+    "verified_utc": "2026-02-14T12:00:00Z"
   }
 }

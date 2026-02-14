@@ -944,7 +944,7 @@ def build_living_map(
         },
         "status_stratification": dict(sorted(status_counts.items())),
         "prisma_flow": {
-            "note": "Adapted PRISMA-S flow for automated evidence gap mapping (not a full PRISMA 2020 flow diagram)",
+            "note": "Adapted PRISMA-S flow for automated trial landscape mapping (not a full PRISMA 2020 flow diagram)",
             "search_date_utc": search_date_utc,
             "ctgov_retrieved": sum(1 for r in studies_rows if r.get("data_sources", "ctgov") == "ctgov" or "ctgov" in r.get("data_sources", "")),
 

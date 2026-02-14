@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Living update orchestrator for the ICU Living Evidence Map.
+Living update orchestrator for the ICU Living Trial Landscape.
 
 Runs the full pipeline with incremental updates:
   1. Determine last successful run date from living_log.jsonl

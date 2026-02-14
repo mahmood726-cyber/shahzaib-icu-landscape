@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Hemodynamic Evidence Insights — analytical dashboard for ICU RCT evidence gaps, temporal trends, and research priorities." />
-  <title>Hemodynamic Evidence Insights</title>
+  <meta name="description" content="Hemodynamic Trial Insights — analytical dashboard for ICU RCT trial coverage, temporal trends, and research priorities." />
+  <title>Hemodynamic Trial Insights</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="lib/plotly.min.js" defer></script>
   <style>
@@ -22,11 +22,10 @@
     .score-card .score-sub{font-size:.8rem;color:var(--clr-text-muted);margin-top:4px}
     .score-card .score-bar{position:absolute;bottom:0;left:0;height:4px;border-radius:0 2px 0 0;transition:width .8s ease}
     .score-green .score-value{color:#1a9850} .score-green .score-bar{background:#1a9850}
-    .score-green .score-value::after{content:" (Good)";font-size:.6rem;color:var(--clr-text-muted);font-weight:400}
     .score-amber .score-value{color:#e67e22} .score-amber .score-bar{background:#e67e22}
-    .score-amber .score-value::after{content:" (Fair)";font-size:.6rem;color:var(--clr-text-muted);font-weight:400}
     .score-red .score-value{color:#d73027} .score-red .score-bar{background:#d73027}
-    .score-red .score-value::after{content:" (Poor)";font-size:.6rem;color:var(--clr-text-muted);font-weight:400}
+    .scores-disclaimer{font-size:.8rem;color:var(--clr-text-muted);font-style:italic;margin-bottom:12px;
+      padding:10px 14px;border-left:3px solid var(--clr-accent);background:var(--clr-surface)}
 
     .insight-box{background:var(--clr-surface-raised);border-left:4px solid var(--clr-accent);
       padding:14px 18px;border-radius:0 var(--radius-md) var(--radius-md) 0;margin-top:16px;font-size:.9rem}
@@ -77,10 +76,10 @@
     <header class="hero reveal">
       <div class="hero-text">
         <a href="index.html" class="back-link" aria-label="Back to main dashboard">&larr; Back to Dashboard</a>
-        <p class="kicker">ICU RCT Living Evidence Gap Map</p>
-        <h1>Hemodynamic Evidence Insights</h1>
+        <p class="kicker">ICU RCT Living Trial Landscape Map</p>
+        <h1>Hemodynamic Trial Insights</h1>
         <p class="lead">
-          Analytical overview of evidence gaps, temporal trends, study design quality,
+          Analytical overview of trial coverage gaps, temporal trends, study design quality,
           and research priorities across <span id="heroMentions">36,639</span> hemodynamic
           outcome mentions in <span id="heroStudies">20,750</span> ICU randomized trials.
         </p>
@@ -107,8 +106,9 @@
     <section class="section reveal" aria-label="Executive summary">
       <div class="section-header">
         <h2>Executive Summary</h2>
-        <p>Key evidence quality indicators computed from trial registry data.</p>
+        <p>Descriptive indicators computed from trial registry data.</p>
       </div>
+      <p class="scores-disclaimer">These indicators are exploratory descriptive statistics derived from trial registration metadata, not validated quality metrics. Thresholds and color-coding are arbitrary and should not be interpreted as benchmarks. See Methods for definitions.</p>
       <div class="score-cards" id="scoreCards">
         <div class="score-card" id="cardDensity">
           <p class="score-label">Evidence Density</p>
@@ -137,15 +137,15 @@
       </div>
     </section>
 
-    <!-- Section 2: Evidence Gap Matrix -->
+    <!-- Section 2: Trial Coverage Matrix -->
     <section class="section reveal" aria-label="Evidence gap matrix">
       <div class="section-header">
-        <h2>Evidence Gap Matrix</h2>
+        <h2>Trial Coverage Matrix</h2>
         <p>Placebo-controlled evidence coverage per hemodynamic parameter. Higher gap score = more research needed.</p>
       </div>
       <div class="panel wide chart-container">
         <div class="chart-toolbar" id="toolbar-gapMatrix"></div>
-        <div id="gapMatrixChart" class="plotly-chart" role="img" aria-label="Diverging bar chart of evidence gaps by hemodynamic parameter"></div>
+        <div id="gapMatrixChart" class="plotly-chart" role="img" aria-label="Diverging bar chart of trial coverage by hemodynamic parameter"></div>
       </div>
       <div class="insight-box" id="gapInsights"></div>
     </section>
@@ -172,7 +172,7 @@
     <section class="section reveal" aria-label="Placebo evidence landscape">
       <div class="section-header">
         <h2>Placebo Evidence Landscape</h2>
-        <p>Tiered assessment of placebo-controlled evidence strength for each hemodynamic parameter.</p>
+        <p>Tiered categorization of placebo-controlled trial count per hemodynamic parameter. Tier thresholds (100+ = Strong, 20+ = Moderate, &lt;20 = Weak) are arbitrary and reflect only study count, not evidence quality.</p>
       </div>
       <div class="panel wide chart-container">
         <div class="chart-toolbar" id="toolbar-placeboLand"></div>
@@ -227,18 +227,18 @@
       <div class="insight-box" id="cooccurInsights"></div>
     </section>
 
-    <!-- Section 7: Research Priority Rankings -->
-    <section class="section reveal" aria-label="Research priority rankings">
+    <!-- Section 7: Trial Coverage Ranking (exploratory) -->
+    <section class="section reveal" aria-label="Trial coverage ranking">
       <div class="section-header">
-        <h2>Research Priority Rankings</h2>
-        <p>Composite scoring to identify where the next ICU hemodynamic RCT should focus.</p>
+        <h2>Trial Coverage Ranking</h2>
+        <p>Exploratory composite score highlighting parameters with less trial coverage. Weights are arbitrary; this is not a validated prioritization instrument.</p>
       </div>
       <div class="panel wide chart-container">
         <div class="chart-toolbar" id="toolbar-priority"></div>
         <div id="priorityChart" class="plotly-chart" role="img" aria-label="Horizontal bar chart of research priority scores"></div>
       </div>
       <div class="panel wide" style="margin-top:16px;overflow-x:auto">
-        <table class="priority-table" id="priorityTable" aria-label="Research priority rankings by composite score">
+        <table class="priority-table" id="priorityTable" aria-label="Trial coverage ranking by exploratory composite score">
           <thead><tr>
             <th scope="col">Rank</th><th scope="col">Parameter</th><th scope="col">Composite</th>
             <th scope="col">Gap (30%)</th><th scope="col">Relevance (25%)</th><th scope="col">Recency (20%)</th>
@@ -517,7 +517,7 @@ function renderGapMatrix() {
 
   const top3 = nk.filter(k => k.study_count >= 50).slice(0, 3);
   const insightEl = document.getElementById("gapInsights");
-  insightEl.innerHTML = '<p class="insight-title">Key Evidence Gaps</p><ul>' +
+  insightEl.innerHTML = '<p class="insight-title">Key Trial Coverage Gaps</p><ul>' +
     top3.map(k => "<li><strong>" + escapeHtml(k.keyword) + "</strong>: " + k.study_count +
       " studies but only " + k.placebo_study_count + " with placebo (" +
       (100 - k.gap).toFixed(0) + "% coverage). Gap score: " + k.gap.toFixed(0) + "</li>").join("") +

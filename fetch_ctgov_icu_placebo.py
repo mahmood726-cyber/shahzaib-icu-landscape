@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fetch ICU/critical care RCTs from ClinicalTrials.gov and extract placebo-arm
-and hemodynamic outcome signals for a living evidence map.
+and hemodynamic outcome signals for a living trial landscape map.
 """
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────────
- * app.js — ICU Living Evidence Map dashboard controller
+ * app.js — ICU Living Trial Landscape dashboard controller
  *
  * Features: dataset loading, aggregation, rendering, FilterState cross-filter
  * engine, dark mode, global search, filter chips, study detail sidebar,
@@ -1736,10 +1736,10 @@ const renderPlotlyCharts = (summary, rows) => {
 // 20. Guided tour
 // ══════════════════════════════════════════════════════════════════════════════
 const TOUR_STEPS = [
-  { selector: ".cards", title: "Summary statistics", text: "Key metrics for the evidence map. Animated counters show totals at a glance.", position: "bottom" },
+  { selector: ".cards", title: "Summary statistics", text: "Key metrics for the trial landscape. Animated counters show totals at a glance.", position: "bottom" },
   { selector: ".focus-bar", title: "Filters", text: "Focus on specific conditions or switch between study count and mention count.", position: "bottom" },
   { selector: "#bubbleMatrixChart", title: "Evidence bubble matrix", text: "Flagship visualization: interventions vs outcomes. Bubble size = studies, color = placebo proportion. Click to filter.", position: "top" },
-  { selector: "#forestPlotChart", title: "Forest plot", text: "Evidence strength per keyword. Bar color indicates heterogeneity (green = low, red = high).", position: "top" },
+  { selector: "#forestPlotChart", title: "Keyword signal bars", text: "Study count per keyword. Bar color reflects design variability (exploratory indicator, not statistical heterogeneity).", position: "top" },
   { selector: "#choroplethChart", title: "World map", text: "Geographic distribution of ICU trials. Click a country to filter all charts.", position: "top" },
   { selector: "#timeSeriesChart", title: "Timeline", text: "Trial registrations over time. Toggle cumulative view in the legend.", position: "top" },
   { selector: "#resultsTable", title: "Data table", text: "Browse individual study outcomes. Click a row to see full details in the sidebar.", position: "top" },
