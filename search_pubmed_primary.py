@@ -96,6 +96,12 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
         re.IGNORECASE,
     ),
+    "dopamine": re.compile(
+        r"(?:dopamine\s+receptor|dopaminergic|dopamine\s+pathway"
+        r"|dopamine\s+D[12345]|dopamine\s+transporter"
+        r"|dopamine\s+(?:agonist|antagonist)\s+(?:for|in)\s+(?:delirium|parkinson|restless))",
+        re.IGNORECASE,
+    ),
 }
 
 
@@ -367,9 +373,9 @@ def search_pubmed_primary(
             "source_registry": "pubmed",
             "brief_title": _csv_safe(title),
             "official_title": "",
-            "overall_status": "COMPLETED",  # Published articles imply completed trials
+            "overall_status": "INFERRED_COMPLETED",  # Published articles imply completed trials (not verified)
             "study_type": "INTERVENTIONAL",
-            "allocation": "RANDOMIZED",
+            "allocation": "INFERRED_RANDOMIZED",  # PubMed [pt] tag, not independently verified
             "primary_purpose": "",
             "intervention_model": "",
             "masking": "",

@@ -417,6 +417,7 @@ function initDarkMode() {
     document.documentElement.setAttribute("data-theme", "dark");
   }
   const toggle = document.getElementById("themeToggle");
+  if (!toggle) return;
   toggle.addEventListener("click", () => {
     const dark = isDark();
     const newTheme = dark ? "light" : "dark";
@@ -1042,6 +1043,15 @@ async function init() {
     renderAll();
   } catch (err) {
     console.error("Failed to load data:", err);
+    const main = document.querySelector("main");
+    if (main) {
+      const msg = document.createElement("div");
+      msg.className = "insight-box";
+      msg.setAttribute("role", "alert");
+      msg.innerHTML = '<p class="insight-title">Data loading failed</p><p>' +
+        escapeHtml(err.message || String(err)) + '. Please check your connection or try refreshing.</p>';
+      main.prepend(msg);
+    }
   }
 
   revealSections();

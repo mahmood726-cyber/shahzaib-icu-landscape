@@ -23,6 +23,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -274,6 +275,9 @@ def main() -> int:
     parser.add_argument("--label", default="broad", metavar="LABEL",
                         help="Build label (default: broad)")
     args = parser.parse_args()
+
+    if not re.match(r"^[a-zA-Z0-9_-]+$", args.label):
+        parser.error(f"Invalid label: {args.label!r} (must be alphanumeric, hyphens, underscores)")
 
     python = _find_python()
     sources = set(s.strip().lower() for s in args.sources.split(",") if s.strip())

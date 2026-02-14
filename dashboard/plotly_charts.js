@@ -20,13 +20,15 @@ const PlotlyCharts = (() => {
     teal: "#9ac2c7",
   };
 
+  // Colorblind-safe categorical palette (Tableau Colorblind 10 + 2 extras)
   const CATEGORY = [
-    "#e2674a", "#2a5569", "#f4b36b", "#9ac2c7",
-    "#c94444", "#8e44ad", "#27ae60", "#326599",
-    "#e67e22", "#7f8c8d", "#2d8659", "#d4956a",
+    "#006BA4", "#FF800E", "#595959", "#5F9ED1",
+    "#C85200", "#898989", "#A2C8EC", "#FFBC79",
+    "#CFCFCF", "#ABABAB", "#8E6C62", "#B87333",
   ];
 
-  const RdYlGn = [[0, "#d73027"], [0.25, "#fc8d59"], [0.5, "#fee08b"], [0.75, "#d9ef8b"], [1, "#1a9850"]];
+  // Colorblind-safe diverging scale (Blue-Yellow-Red, avoids red-green confusion)
+  const RdYlGn = [[0, "#313695"], [0.25, "#4575b4"], [0.5, "#fee08b"], [0.75, "#f46d43"], [1, "#a50026"]];
 
   // ── Dark mode detection ───────────────────────────────────────────
   const isDark = () => document.documentElement.getAttribute("data-theme") === "dark";
@@ -350,7 +352,8 @@ const PlotlyCharts = (() => {
     const withPlacebo = flow.with_placebo_arms || 0;
     const hemoPlacebo = flow.with_hemo_and_placebo || 0;
     const excluded = flow.excluded_no_hemo || 0;
-    const searchDate = flow.search_date_utc ? flow.search_date_utc.slice(0, 10) : "N/A";
+    const rawDate = flow.search_date_utc ? flow.search_date_utc.slice(0, 10) : "N/A";
+    const searchDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : "N/A";
 
     const tc = getThemeColors();
     const boxFill = isDark() ? "#242736" : "white";

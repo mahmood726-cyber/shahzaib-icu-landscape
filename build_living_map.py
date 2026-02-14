@@ -234,6 +234,12 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
         re.IGNORECASE,
     ),
+    "dopamine": re.compile(
+        r"(?:dopamine\s+receptor|dopaminergic|dopamine\s+pathway"
+        r"|dopamine\s+D[12345]|dopamine\s+transporter"
+        r"|dopamine\s+(?:agonist|antagonist)\s+(?:for|in)\s+(?:delirium|parkinson|restless))",
+        re.IGNORECASE,
+    ),
 }
 
 
@@ -376,7 +382,10 @@ def _load_enrichment(
     effective_config_path = config_path or DEFAULT_CONFIG_PATH
     config = load_config(effective_config_path)
     orch = EnrichmentOrchestrator(enrich_db, config)
-    return orch.get_enrichment_summaries(list(nct_ids))
+    try:
+        return orch.get_enrichment_summaries(list(nct_ids))
+    finally:
+        orch.close()
 
 
 def _fuzzy_title_match(title_a: str, title_b: str, threshold: float = 0.85) -> bool:
@@ -940,6 +949,11 @@ def build_living_map(
             "ctgov_retrieved": sum(1 for r in studies_rows if r.get("data_sources", "ctgov") == "ctgov" or "ctgov" in r.get("data_sources", "")),
 
             "pubmed_retrieved": sum(1 for r in studies_rows if "pubmed" in r.get("data_sources", "")),
+            "duplicates_removed": (
+                sum(1 for r in studies_rows if r.get("data_sources", "ctgov") == "ctgov" or "ctgov" in r.get("data_sources", ""))
+                + sum(1 for r in studies_rows if "pubmed" in r.get("data_sources", ""))
+                - total_studies
+            ),
             "total_after_dedup": total_studies,
             "with_hemodynamic_outcomes": len(studies_with_hemo),
             "with_placebo_arms": studies_with_placebo,

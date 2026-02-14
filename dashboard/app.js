@@ -1588,6 +1588,22 @@ const removeSkeleton = (containerId) => {
   if (skel) skel.remove();
 };
 
+// Fallback: if skeletons persist after 15s (e.g. Plotly failed to load), show error message
+setTimeout(() => {
+  document.querySelectorAll(".skeleton-chart").forEach((skel) => {
+    const parent = skel.parentElement;
+    skel.remove();
+    if (parent && parent.children.length === 0) {
+      const msg = document.createElement("p");
+      msg.className = "note";
+      msg.style.textAlign = "center";
+      msg.style.padding = "40px 16px";
+      msg.textContent = "Chart could not be loaded. Try refreshing the page.";
+      parent.appendChild(msg);
+    }
+  });
+}, 15000);
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 19b. Plotly chart rendering (calls all 12 charts) — lazy loading
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2134,10 +2150,24 @@ const init = async () => {
   // Start guided tour (first-time only)
   setTimeout(() => startTour(), 1500);
 
-  // Auto-refresh every 60 minutes
+  // Check for new data every 60 minutes — show toast instead of silent refresh
   setInterval(() => {
-    delete datasetCache[currentDataset];
-    onDatasetChange(currentDataset).catch(() => {});
+    if (document.hidden) return; // skip if tab not visible
+    const toast = document.createElement("div");
+    toast.className = "chip chip--clear";
+    toast.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:9000;cursor:pointer;padding:10px 20px;font-size:0.875rem";
+    toast.textContent = "New data may be available — click to refresh";
+    toast.setAttribute("role", "status");
+    toast.addEventListener("click", () => {
+      toast.remove();
+      delete datasetCache[currentDataset];
+      onDatasetChange(currentDataset).catch((err) => {
+        console.error("Auto-refresh failed:", err);
+      });
+    });
+    document.body.appendChild(toast);
+    // Auto-dismiss after 30 seconds
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 30000);
   }, 60 * 60 * 1000);
 };
 

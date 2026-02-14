@@ -140,6 +140,12 @@ _ABBREVIATION_NEGATIVE_CONTEXT = {
         r"|perfusion\s+(?:scan|imaging|study|scintigraphy))",
         re.IGNORECASE,
     ),
+    "dopamine": re.compile(
+        r"(?:dopamine\s+receptor|dopaminergic|dopamine\s+pathway"
+        r"|dopamine\s+D[12345]|dopamine\s+transporter"
+        r"|dopamine\s+(?:agonist|antagonist)\s+(?:for|in)\s+(?:delirium|parkinson|restless))",
+        re.IGNORECASE,
+    ),
 }
 
 

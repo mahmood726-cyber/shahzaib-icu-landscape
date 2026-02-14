@@ -4,7 +4,7 @@
  * Strategy: Network-first for data files, cache-first for static assets.
  * ────────────────────────────────────────────────────────────────────────── */
 
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const CACHE_NAME = `icu-evidence-map-v${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
@@ -77,17 +77,17 @@ self.addEventListener("fetch", (event) => {
         .catch(() => caches.match(event.request))
     );
   } else {
-    // Cache-first for static assets
+    // Stale-while-revalidate for static assets (serve cache, update in background)
     event.respondWith(
       caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
+        const fetchPromise = fetch(event.request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
           return response;
-        });
+        }).catch(() => cached);
+        return cached || fetchPromise;
       })
     );
   }

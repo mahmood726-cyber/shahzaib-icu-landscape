@@ -48,7 +48,7 @@
   --font-body: "Palatino Linotype", "Book Antiqua", Palatino, serif;
   --font-heading: "Copperplate Gothic", "Garamond", serif;
   --font-mono: "Courier New", Courier, monospace;
-  --fs-xs: 0.64rem;
+  --fs-xs: 0.75rem;
   --fs-sm: 0.8rem;
   --fs-base: 1rem;
   --fs-lg: 1.25rem;
@@ -100,6 +100,7 @@
   --chart-paper: rgba(0, 0, 0, 0);
   --grid-color: rgba(255, 255, 255, 0.03);
   --orb-1: radial-gradient(circle, rgba(244, 179, 107, 0.15), transparent 70%);
+  --clr-accent-2: #5ba8c8;
   --orb-2: radial-gradient(circle, rgba(154, 194, 199, 0.1), transparent 70%);
 }
 
@@ -292,6 +293,20 @@ body {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+a.meta-card {
+  text-decoration: none;
+}
+
+a.meta-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+a.meta-card:focus-visible {
+  outline: 3px solid var(--clr-primary);
+  outline-offset: 2px;
+}
+
 .meta-label {
   margin: 0 0 var(--space-sm);
   font-size: var(--fs-sm);
@@ -355,7 +370,7 @@ body {
 
 .badge-gold { background: linear-gradient(135deg, #c9a227, #e8d174); color: #3a2e00; }
 .badge-silver { background: linear-gradient(135deg, #8e9eab, #c0c8d0); color: #1a2a36; }
-.badge-bronze { background: linear-gradient(135deg, #b87333, #d4956a); }
+.badge-bronze { background: linear-gradient(135deg, #b87333, #d4956a); color: #3a2000; }
 .badge-none { background: #bbb; }
 
 .badge-id {
@@ -395,7 +410,7 @@ body {
 .badge-drift,
 .badge-abstentions {
   margin-top: 6px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 
@@ -618,6 +633,11 @@ body {
   background: var(--clr-danger);
 }
 
+.chip--clear:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 @keyframes chipAppear {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -627,6 +647,7 @@ body {
 .global-search {
   position: relative;
   flex: 0 1 320px;
+  margin-top: var(--space-md);
 }
 
 .global-search input {
@@ -965,7 +986,7 @@ body {
   gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1052,7 +1073,7 @@ body {
   display: inline-block;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1134,6 +1155,12 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.chart-grid + .chart-grid,
+.chart-grid + .panel.wide.chart-container,
+.panel.wide.chart-container + .chart-grid {
   margin-top: var(--space-md);
 }
 
@@ -1363,7 +1390,7 @@ mark {
   display: inline-block;
   padding: 2px 10px;
   border-radius: var(--radius-pill);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -1589,6 +1616,8 @@ input:focus:not(:focus-visible) {
 
 /* ── 37. Reduced Motion ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
   *,
   *::before,
   *::after {

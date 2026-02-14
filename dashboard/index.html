@@ -45,7 +45,7 @@
           Scope includes adult, pediatric, and neonatal ICU populations.
         </p>
         <!-- Global search -->
-        <div class="global-search" style="margin-top:16px">
+        <div class="global-search">
           <span class="search-icon" aria-hidden="true">&#128269;</span>
           <input type="search" id="globalSearch" placeholder="Search studies... (e.g., keyword:MAP, country:USA)" aria-label="Search studies" />
         </div>
@@ -72,7 +72,7 @@
           </div>
           <p class="meta-note">Switch updates stats and explorer data.</p>
         </div>
-        <a href="insights.html" class="meta-card" style="text-decoration:none">
+        <a href="insights.html" class="meta-card">
           <p class="meta-label">Insights</p>
           <p class="meta-value" style="font-size:1.1rem">Evidence Analysis</p>
           <p class="meta-note">Gaps, trends &amp; priorities</p>
@@ -96,7 +96,7 @@
     </header>
 
     <!-- Filter chips bar -->
-    <div class="filter-chips" id="filterChips" aria-label="Active filters"></div>
+    <div class="filter-chips" id="filterChips" role="region" aria-label="Active filters"></div>
 
     <!-- Live region for announcements -->
     <div id="liveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
@@ -157,11 +157,11 @@
       <div class="split">
         <div class="panel">
           <h3>Top hemodynamic keywords</h3>
-          <div class="bar-list" id="keywordBars" role="img" aria-label="Bar chart of top hemodynamic keywords"></div>
+          <div class="bar-list" id="keywordBars" role="group" aria-label="Top hemodynamic keywords"></div>
         </div>
         <div class="panel">
           <h3>Top ICU conditions</h3>
-          <div class="bar-list" id="conditionBars" role="img" aria-label="Bar chart of top ICU conditions"></div>
+          <div class="bar-list" id="conditionBars" role="group" aria-label="Top ICU conditions"></div>
         </div>
       </div>
     </section>
@@ -172,7 +172,7 @@
         <p>Primary vs secondary vs other outcome emphasis.</p>
       </div>
       <div class="panel wide">
-        <div class="bar-list" id="outcomeBars" role="img" aria-label="Bar chart of outcome types"></div>
+        <div class="bar-list" id="outcomeBars" role="group" aria-label="Outcome types"></div>
       </div>
     </section>
 
@@ -194,7 +194,7 @@
 
     <section class="section reveal" aria-label="PRISMA-S flow diagram">
       <div class="section-header">
-        <h2>PRISMA-S flow</h2>
+        <h2>Adapted PRISMA-S flow</h2>
         <p>Multi-source identification, screening, and inclusion.</p>
       </div>
       <div class="panel wide chart-container">
@@ -244,7 +244,7 @@
         </div>
       </div>
 
-      <div class="chart-grid" style="margin-top:16px">
+      <div class="chart-grid">
         <div class="panel chart-container">
           <div class="chart-toolbar" id="toolbar-treemap"></div>
           <div id="treemapChart" class="plotly-chart" role="img" aria-label="Treemap of hemodynamic keywords by study count"></div>
@@ -254,11 +254,11 @@
           <div id="sunburstChart" class="plotly-chart" role="img" aria-label="Sunburst chart of outcome hierarchy"></div>
         </div>
       </div>
-      <div class="panel wide chart-container" style="margin-top:16px">
+      <div class="panel wide chart-container">
         <div class="chart-toolbar" id="toolbar-heatmap"></div>
         <div id="heatmapChart" class="plotly-chart" role="img" aria-label="Heatmap of keyword-condition cross-tabulation"></div>
       </div>
-      <div class="chart-grid" style="margin-top:16px">
+      <div class="chart-grid">
         <div class="panel chart-container">
           <div class="chart-toolbar" id="toolbar-timeSeries"></div>
           <div id="timeSeriesChart" class="plotly-chart" role="img" aria-label="Time series of trial registrations by year"></div>
@@ -268,7 +268,7 @@
           <div id="networkChart" class="plotly-chart" role="img" aria-label="Force-directed keyword co-occurrence network"></div>
         </div>
       </div>
-      <div class="panel wide chart-container" style="margin-top:16px" id="choroplethSection">
+      <div class="panel wide chart-container" id="choroplethSection">
         <div class="chart-toolbar" id="toolbar-choropleth"></div>
         <div id="choroplethChart" class="plotly-chart" role="img" aria-label="Geographic distribution of ICU trials"></div>
       </div>
@@ -336,8 +336,8 @@
           <button class="btn btn--ghost" id="exportJson" type="button">Export JSON</button>
           <button class="btn btn--ghost" id="exportClipboard" type="button">Copy to clipboard</button>
         </div>
-        <div class="table-wrap">
-          <table class="results-table" id="resultsTable" role="table" aria-label="Hemodynamic outcomes data table">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Hemodynamic outcomes data table (scrollable)">
+          <table class="results-table" id="resultsTable" aria-label="Hemodynamic outcomes data table">
             <thead>
               <tr>
                 <th scope="col">NCT ID</th>
@@ -479,7 +479,7 @@
     </footer>
   </main>
 
-  <script src="plotly_charts.js"></script>
-  <script src="app.js"></script>
+  <script src="plotly_charts.js" defer></script>
+  <script src="app.js" defer></script>
 </body>
 </html>
