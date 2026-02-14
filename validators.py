@@ -406,7 +406,7 @@ def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult
 
 
 def validate_enrichment_source_diversity(summary: Dict[str, Any]) -> ValidationResult:
-    """P1-enrichment-source-diversity: >=3 of 8 sources contributed data."""
+    """P1-enrichment-source-diversity: >=3 of 7 sources contributed data."""
     enrichment = summary.get("enrichment", {})
     if not enrichment.get("enabled"):
         return ValidationResult("P1-enrichment-source-diversity", "P1", True,

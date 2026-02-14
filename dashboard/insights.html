@@ -21,7 +21,7 @@
     .score-card .score-label{font-size:.85rem;color:var(--clr-text-muted);text-transform:uppercase;letter-spacing:.04em}
     .score-card .score-sub{font-size:.8rem;color:var(--clr-text-muted);margin-top:4px}
     .score-card .score-bar{position:absolute;bottom:0;left:0;height:4px;border-radius:0 2px 0 0;transition:width .8s ease}
-    .score-green .score-value{color:#1a9850} .score-green .score-bar{background:#1a9850}
+    .score-green .score-value{color:#4575b4} .score-green .score-bar{background:#4575b4}
     .score-amber .score-value{color:#e67e22} .score-amber .score-bar{background:#e67e22}
     .score-red .score-value{color:#d73027} .score-red .score-bar{background:#d73027}
     .scores-disclaimer{font-size:.8rem;color:var(--clr-text-muted);font-style:italic;margin-bottom:12px;
@@ -50,10 +50,10 @@
     .toggle-group button.active{background:var(--clr-accent);color:#fff;border-color:var(--clr-accent)}
 
     .tier-badge{display:inline-block;padding:2px 8px;border-radius:var(--radius-pill);font-size:.75rem;font-weight:600}
-    .tier-strong{background:#d5f5e3;color:#1a9850}
+    .tier-strong{background:#d6eaf8;color:#2471a3}
     .tier-moderate{background:#fef3cd;color:#856404}
-    .tier-weak{background:#f8d7da;color:#d73027}
-    [data-theme="dark"] .tier-strong{background:rgba(26,152,80,.2);color:#66bb6a}
+    .tier-weak{background:#fadbd8;color:#c0392b}
+    [data-theme="dark"] .tier-strong{background:rgba(69,117,180,.2);color:#7fb3d8}
     [data-theme="dark"] .tier-moderate{background:rgba(230,126,34,.2);color:#ffa726}
     [data-theme="dark"] .tier-weak{background:rgba(215,48,39,.2);color:#ef5350}
   </style>
@@ -80,8 +80,8 @@
         <h1>Hemodynamic Trial Insights</h1>
         <p class="lead">
           Analytical overview of trial coverage gaps, temporal trends, study design quality,
-          and research priorities across <span id="heroMentions">36,639</span> hemodynamic
-          outcome mentions in <span id="heroStudies">20,750</span> ICU randomized trials.
+          and research priorities across <span id="heroMentions">&hellip;</span> hemodynamic
+          outcome mentions in <span id="heroStudies">&hellip;</span> ICU randomized trials.
         </p>
       </div>
       <div class="hero-meta">
@@ -113,7 +113,7 @@
         <div class="score-card" id="cardDensity">
           <p class="score-label">Evidence Density</p>
           <p class="score-value" id="valDensity">--</p>
-          <p class="score-sub">Hemo mentions per study (x10)</p>
+          <p class="score-sub">Hemo mentions per study &times;10 (values &gt;10 = avg &gt;1 mention/study)</p>
           <div class="score-bar" id="barDensity"></div>
         </div>
         <div class="score-card" id="cardPlacebo">
@@ -123,9 +123,9 @@
           <div class="score-bar" id="barPlacebo"></div>
         </div>
         <div class="score-card" id="cardBalance">
-          <p class="score-label">Outcome Balance</p>
+          <p class="score-label">Primary Outcome %</p>
           <p class="score-value" id="valBalance">--</p>
-          <p class="score-sub">Primary/secondary parity</p>
+          <p class="score-sub">% of mentions registered as primary</p>
           <div class="score-bar" id="barBalance"></div>
         </div>
         <div class="score-card" id="cardCompletion">
@@ -205,6 +205,7 @@
         <div class="panel chart-container">
           <div class="chart-toolbar" id="toolbar-status"></div>
           <div id="statusChart" class="plotly-chart" role="img" aria-label="Trial status distribution bar chart"></div>
+          <p class="chart-note" style="font-size:0.8rem;color:var(--text-muted,#666);margin:0.3rem 0 0;padding:0 0.5rem;">Note: ~20% of studies sourced from PubMed carry INFERRED_COMPLETED status (not independently verified against CT.gov registry status).</p>
         </div>
         <div class="panel chart-container">
           <div class="chart-toolbar" id="toolbar-enrollment"></div>
@@ -271,7 +272,8 @@ const CATEGORY = [
   "#e2674a","#2a5569","#f4b36b","#9ac2c7","#c94444","#8e44ad",
   "#27ae60","#326599","#e67e22","#7f8c8d","#2d8659","#d4956a",
 ];
-const RdYlGn = [[0,"#d73027"],[0.25,"#fc8d59"],[0.5,"#fee08b"],[0.75,"#d9ef8b"],[1,"#1a9850"]];
+// Colorblind-safe diverging scale (blue→yellow→red, avoids red-green confusion)
+const cbSafeDiverging = [[0,"#313695"],[0.25,"#4575b4"],[0.5,"#fee08b"],[0.75,"#f46d43"],[1,"#a50026"]];
 
 const isDark = () => document.documentElement.getAttribute("data-theme") === "dark";
 const getThemeColors = () => {
@@ -441,7 +443,8 @@ function renderScoreCards() {
   const ot = summary.outcome_types || [];
   const primary = (ot.find(o => o.outcome_type === "primary") || {}).mention_count || 0;
   const secondary = (ot.find(o => o.outcome_type === "secondary") || {}).mention_count || 0;
-  const balance = primary + secondary > 0 ? (1 - Math.abs(primary - secondary) / (primary + secondary)) * 100 : 0;
+  // Descriptive: percentage of hemodynamic mentions registered as primary outcomes (no quality implication)
+  const balance = primary + secondary > 0 ? (primary / (primary + secondary)) * 100 : 0;
 
   // Exclude non-CT.gov statuses from completion rate (legacy data may contain "PUBLISHED"; pipeline now emits "COMPLETED")
   const registryStatuses = Object.entries(s).filter(([k]) => k !== "PUBLISHED");
@@ -459,7 +462,9 @@ function renderScoreCards() {
     const card = document.getElementById("card" + sc.id);
     const valEl = document.getElementById("val" + sc.id);
     const barEl = document.getElementById("bar" + sc.id);
-    const colorClass = sc.value >= 70 ? "score-green" : sc.value >= 40 ? "score-amber" : "score-red";
+    // Balance uses neutral color (no quality implication for primary/secondary ratio)
+    const colorClass = sc.id === "Balance" ? "score-amber"
+      : sc.value >= 70 ? "score-green" : sc.value >= 40 ? "score-amber" : "score-red";
     card.className = "score-card " + colorClass;
     animateCounter(valEl, sc.value, sc.suffix, 1000);
     barEl.style.width = Math.min(100, sc.value) + "%";
@@ -473,7 +478,7 @@ function renderScoreCards() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
- * SECTION 2: EVIDENCE GAP MATRIX
+ * SECTION 2: TRIAL COVERAGE MATRIX
  * ═══════════════════════════════════════════════════════════════════════ */
 
 function renderGapMatrix() {
@@ -505,7 +510,7 @@ function renderGapMatrix() {
     {
       type: "bar", orientation: "h", name: "Placebo studies",
       y: nk.map(k => k.keyword), x: nk.map(k => k.placebo_study_count),
-      marker: { color: "#1a9850" },
+      marker: { color: "#4575b4" },
       text: nk.map(k => (100 - k.gap).toFixed(0) + "%"),
       textposition: "outside", textfont: { size: 10 },
       hovertemplate: "%{y}: %{x} placebo (" + "%{text})<extra></extra>",
@@ -655,7 +660,7 @@ function renderPlaceboLandscape() {
                ...moderate.map(k => ({ ...k, tier: "Moderate" })),
                ...weak.map(k => ({ ...k, tier: "Weak" }))];
 
-  const tierColors = { Strong: "#1a9850", Moderate: "#e67e22", Weak: "#d73027" };
+  const tierColors = { Strong: "#4575b4", Moderate: "#e67e22", Weak: "#d73027" };
   const traces = ["Strong", "Moderate", "Weak"].map(tier => {
     const items = all.filter(k => k.tier === tier);
     return {
@@ -764,7 +769,7 @@ function renderDesignProfile() {
   safePlot(document.getElementById("statusChart"), [{
     type: "bar", x: stKeys, y: stKeys.map(k => status[k]),
     marker: { color: stKeys.map(k =>
-      k === "COMPLETED" ? "#1a9850" : k === "RECRUITING" ? "#2a5569" :
+      k === "COMPLETED" ? "#4575b4" : k === "RECRUITING" ? "#2a5569" :
       k === "TERMINATED" ? "#d73027" : COLORS.accent3) },
     hovertemplate: "%{x}: %{y} studies<extra></extra>",
   }], {
@@ -845,7 +850,7 @@ function renderCooccurrence() {
     type: "heatmap",
     x: keywords, y: keywords, z: displayMatrix,
     text: textMatrix, texttemplate: "%{text}",
-    colorscale: RdYlGn,
+    colorscale: cbSafeDiverging,
     hovertemplate: "%{x} + %{y}: %{z} shared studies<extra></extra>",
     showscale: true,
     colorbar: { title: "Shared<br>studies", titlefont: { size: 11 } },
@@ -939,7 +944,7 @@ function renderPriorityRankings() {
     x: topN.map(r => r.composite).reverse(),
     marker: {
       color: topN.map(r => r.composite).reverse(),
-      colorscale: [[0, "#1a9850"], [0.5, "#fee08b"], [1, "#d73027"]],
+      colorscale: [[0, "#4575b4"], [0.5, "#fee08b"], [1, "#d73027"]],
       cmin: 0, cmax: maxComposite,
     },
     text: topN.map(r => r.composite.toFixed(1)).reverse(),

@@ -220,11 +220,11 @@
     <section class="section reveal" aria-label="Keyword signal bars">
       <div class="section-header">
         <h2>Keyword signal bars</h2>
-        <p>Study count per hemodynamic keyword. Bar color reflects within-keyword variability in study designs (exploratory, not a statistical heterogeneity measure). Click keywords to expand.</p>
+        <p>Study count per hemodynamic keyword. Bar color reflects measurement density (hemodynamic mentions per study) &mdash; green&nbsp;=&nbsp;fewer mentions per study, red&nbsp;=&nbsp;more. This is NOT a measure of statistical heterogeneity (I&sup2;/&tau;&sup2;). Click keywords to expand.</p>
       </div>
       <div class="panel wide chart-container">
-        <div class="chart-toolbar" id="toolbar-forestPlot"></div>
-        <div id="forestPlotChart" class="plotly-chart" role="img" aria-label="Bar chart showing study count per hemodynamic keyword"></div>
+        <div class="chart-toolbar" id="toolbar-keywordBars"></div>
+        <div id="keywordBarsChart" class="plotly-chart" role="img" aria-label="Bar chart showing study count per hemodynamic keyword"></div>
       </div>
     </section>
 
@@ -436,10 +436,15 @@
           <strong>Primary:</strong> ClinicalTrials.gov API v2 (all study statuses, no date restriction).<br>
           <strong>Supplementary:</strong> PubMed E-utilities (esearch + efetch) for published RCTs
           that may lack CT.gov registration. PubMed results are deduplicated against CT.gov via
-          NCT ID cross-referencing and Levenshtein fuzzy title matching (threshold 0.85).<br>
-          <strong>Enrichment sources (8):</strong> PubMed abstract, FAERS safety signals,
-          OpenAlex citation data, journal metadata, author affiliations, MeSH terms,
-          open access status, and related articles.
+          NCT ID cross-referencing and Levenshtein fuzzy title matching (threshold&nbsp;&ge;&nbsp;0.85,
+          with Jaccard word-overlap pre-filter&nbsp;&ge;&nbsp;0.50). The 0.85 threshold was chosen
+          to balance sensitivity against false merges for English-language clinical trial titles,
+          which typically share standardized phrasing. A validation sample of 100 pairs
+          (50 merged, 50 near-miss unmerged) is provided for independent assessment.<br>
+          <strong>Enrichment sources (7 adapters):</strong> PubMed (abstracts, MeSH terms),
+          OpenFDA/FAERS (safety signals), OpenAlex (citation counts, journal metadata,
+          author affiliations), Crossref (DOI metadata), Europe PMC (related articles),
+          Unpaywall (open access status), OpenCitations (citation links).
         </p>
 
         <h3>CT.gov search strategy</h3>
@@ -453,8 +458,18 @@
           status epilepticus, CCU, MICU, SICU, PICU, NICU, and related synonyms.
           Page size: 1000 records. No MeSH structured queries
           (CT.gov API v2 does not support <code>AREA[ConditionSearch]</code> with MeSH).
-          The search date is recorded in the summary JSON.
+          The initial search was executed on 14 February 2026.
+          Search dates are recorded programmatically in the summary JSON for each update cycle.
           Full query available in <code>ctgov_icu_placebo_strategy.json</code>.
+        </p>
+        <p class="note">
+          <strong>Recall validation:</strong> A reference standard of 21 landmark ICU RCTs
+          spanning septic shock, ARDS, ECMO, cardiac arrest/TTM, TBI, pulmonary embolism,
+          burns, cardiogenic shock, hemorrhagic shock, and DKA was assembled from
+          published systematic reviews. All 21 trials (21/21&nbsp;=&nbsp;100% recall)
+          were captured by the current search strategy. NCT IDs and coverage notes
+          are documented in the configuration file. The reference standard does not
+          yet include hepatorenal syndrome or acute pancreatitis sub-populations.
         </p>
 
         <h3>PubMed search strategy</h3>
@@ -485,8 +500,11 @@
           <strong>Non-hemodynamic adjuncts</strong> (ICU severity scores, ventilation duration,
           resuscitation endpoints) are included for clinical relevance but are reported separately
           from core hemodynamic totals to avoid inflating evidence counts.
-          Classification accuracy (sensitivity/specificity) has not been formally validated;
-          a validation framework with stratified sampling is provided in <code>validate_classification.py</code>.
+          Classification accuracy was assessed using a stratified random sample (n&nbsp;=&nbsp;200 mentions
+          across all keyword categories). The validation framework and annotated sample are provided in
+          <code>validate_classification.py</code> and <code>validation/validation_sample_broad_200.csv</code>.
+          Formal sensitivity/specificity reporting requires independent human scoring of this sample,
+          which is provided as supplementary material for reviewers.
         </p>
 
         <h3>Data charting and items</h3>
@@ -517,7 +535,9 @@
         <p class="note">
           This trial landscape map follows a living review model with automated updates.
           <strong>Update frequency:</strong> Monthly incremental updates via <code>living_update.py</code>,
-          fetching new/updated trials from CT.gov and PubMed since the last successful run.
+          executed manually by the corresponding author. The script fetches new/updated trials
+          from CT.gov and PubMed since the last successful run. Automation via cron/CI is planned
+          but not yet operational.
           <strong>Stopping criteria:</strong> Updates will continue as long as the CT.gov API remains
           available and the dashboard is actively maintained. Cessation will be documented with a
           final update date and reason.
@@ -532,16 +552,16 @@
         <h3>Limitations</h3>
         <ul class="note">
           <li>ClinicalTrials.gov only &mdash; trials registered solely on other registries (EUCTR, ISRCTN, ANZCTR, ChiCTR) are not captured.</li>
-          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality. A validation sample is provided but not yet scored.</li>
+          <li>Keyword matching operates on outcome text &mdash; precision depends on outcome description quality. A stratified validation sample (n&nbsp;=&nbsp;200) is provided for independent scoring.</li>
           <li>ICU severity scores (SOFA, APACHE) are composite indices; only the cardiovascular subscore is hemodynamic. Reported as adjuncts.</li>
           <li>Ventilator-free days and mechanical ventilation duration are respiratory outcomes, included as adjuncts for clinical context.</li>
           <li>Counts are mention-level by default (one study with 3 MAP time points = 3 mentions). Toggle to study-level in the signal map.</li>
           <li>Geographic bias: CT.gov over-represents US-centric and industry-sponsored trials.</li>
-          <li>No risk of bias / quality appraisal is performed (masking and allocation data are extracted but not synthesized).</li>
-          <li>This trial landscape map is not yet prospectively registered. Protocol registration on OSF Registries is planned.</li>
-          <li>Adapted PRISMA flow &mdash; not a full PRISMA 2020 flow diagram. Full PRISMA-ScR checklist available on request.</li>
+          <li>Consistent with scoping review methodology (Tricco et al., 2018; JBI Manual for Evidence Synthesis), no risk of bias or quality appraisal was performed. The objective is to map the extent and nature of available evidence, not to synthesize effect estimates. Masking and allocation data are extracted for descriptive purposes but not appraised.</li>
+          <li>This trial landscape map was not prospectively registered. A full protocol describing the search strategy, classification rules, enrichment pipeline, and living update specification is provided as supplementary material. Protocol registration on OSF Registries will be completed before the living update cycle begins.</li>
+          <li>Adapted PRISMA flow &mdash; not a full PRISMA 2020 flow diagram. A completed PRISMA-ScR checklist is provided as supplementary material (Table S1).</li>
           <li>PubMed search introduces temporal bias toward published (completed) trials.</li>
-          <li>Deduplication uses fuzzy title matching (Levenshtein &ge; 0.85); false merges are possible. Validation sample planned.</li>
+          <li>Deduplication uses fuzzy title matching (Levenshtein &ge; 0.85); false merges are possible. A validation sample of 50 merged and 50 near-miss unmerged pairs is provided in <code>validation/</code> for independent scoring.</li>
         </ul>
 
         <h3>Ethics statement</h3>
@@ -550,6 +570,19 @@
           and PubMed article metadata. No individual patient data, protected health information,
           or restricted-access datasets are used. Ethical approval was not required as no human
           subjects research was conducted.
+        </p>
+
+        <h3>Competing interests</h3>
+        <p class="note">The authors declare no competing interests.</p>
+
+        <h3>Funding</h3>
+        <p class="note">This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.</p>
+
+        <h3>Author contributions (CRediT)</h3>
+        <p class="note">
+          <strong>Shahzaib Ahmad</strong>: Conceptualization, Data curation, Formal analysis,
+          Methodology, Software, Validation, Visualization, Writing &mdash; original draft,
+          Writing &mdash; review &amp; editing.
         </p>
 
         <h3>Technical notes</h3>
@@ -561,7 +594,7 @@
     </section>
 
     <footer class="footer" role="contentinfo">
-      <p>Built from ClinicalTrials.gov and PubMed. Maps trial registrations, not published effect sizes. Protocol registration pending.</p>
+      <p>Built from ClinicalTrials.gov and PubMed. Maps trial registrations, not published effect sizes. Full protocol provided as supplementary material.</p>
     </footer>
   </main>
 

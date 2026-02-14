@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional, Set
 
 ROOT = Path(__file__).resolve().parent
 LIVING_LOG_PATH = ROOT / "living_log.jsonl"
+LOCK_PATH = ROOT / ".living_update.lock"
 OUTPUT_DIR = ROOT / "output"
 DASHBOARD_DIR = ROOT / "dashboard" / "data"
 LOG_DIR = ROOT / "logs"
@@ -256,7 +257,56 @@ def _merge_incremental_csvs(
     print(f"  Merge: {len(updated_nct_ids)} updated NCT IDs merged into full dataset", flush=True)
 
 
+def _acquire_lock():
+    """Acquire a file lock to prevent concurrent living_update.py runs.
+
+    Returns the lock file handle (caller must keep it open until done).
+    Raises SystemExit if another instance is already running.
+    """
+    try:
+        # Open in exclusive-create mode — fails if file already exists
+        # On Windows, use msvcrt; on Unix, use fcntl
+        lock_fh = open(LOCK_PATH, "x", encoding="utf-8")
+        lock_fh.write(f"pid={os.getpid()} started={datetime.now(timezone.utc).isoformat()}\n")
+        lock_fh.flush()
+        return lock_fh
+    except FileExistsError:
+        # Check if the lock is stale (>24 hours old)
+        try:
+            age = datetime.now(timezone.utc).timestamp() - LOCK_PATH.stat().st_mtime
+            if age > 86400:  # 24 hours
+                print(f"WARNING: Stale lock file ({age/3600:.1f}h old) — removing", flush=True)
+                LOCK_PATH.unlink(missing_ok=True)
+                lock_fh = open(LOCK_PATH, "x", encoding="utf-8")
+                lock_fh.write(f"pid={os.getpid()} started={datetime.now(timezone.utc).isoformat()}\n")
+                lock_fh.flush()
+                return lock_fh
+        except OSError:
+            pass
+        print("ERROR: Another living_update.py instance is already running "
+              f"(lock file: {LOCK_PATH}). Remove it manually if this is incorrect.",
+              file=sys.stderr, flush=True)
+        raise SystemExit(3)
+
+
+def _release_lock(lock_fh):
+    """Release the file lock."""
+    try:
+        lock_fh.close()
+        LOCK_PATH.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def main() -> int:
+    lock_fh = _acquire_lock()
+    try:
+        return _main_impl()
+    finally:
+        _release_lock(lock_fh)
+
+
+def _main_impl() -> int:
     parser = argparse.ArgumentParser(
         description="ICU Living Map — daily living update",
         epilog="Examples:\n"

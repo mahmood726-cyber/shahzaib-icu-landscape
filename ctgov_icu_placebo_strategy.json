@@ -134,7 +134,7 @@
   ],
   "recall_reference_standard": {
     "description": "Verified CT.gov-registered ICU hemodynamic RCTs for search recall validation. All NCT IDs verified against ClinicalTrials.gov API. Trials registered only on non-CT.gov registries (VASST, VANISH, LeoPARDS, ProMISe) are excluded — they are expected to be absent.",
-    "scope_note": "Covers septic shock (5), corticosteroids in sepsis (2), ARDS (2), ECMO (1), post-cardiac arrest/TTM (2), TBI (2), pulmonary embolism (1), burns (1). Does not validate cardiogenic shock, hemorrhagic shock, DKA, or hepatorenal syndrome coverage.",
+    "scope_note": "Covers septic shock (5), corticosteroids in sepsis (2), ARDS (2), ECMO (1), post-cardiac arrest/TTM (2), TBI (2), pulmonary embolism (1), burns (1), cardiogenic shock (3), hemorrhagic shock (2), DKA (1). Does not yet validate hepatorenal syndrome or acute pancreatitis coverage.",
     "nct_ids": [
       "NCT00510835",
       "NCT00975793",
@@ -150,7 +150,13 @@
       "NCT00155987",
       "NCT00316004",
       "NCT04430569",
-      "NCT05069922"
+      "NCT05069922",
+      "NCT00000552",
+      "NCT04728932",
+      "NCT00314704",
+      "NCT02071290",
+      "NCT01433276",
+      "NCT05808972"
     ],
     "trial_names": [
       "ProCESS (NCT00510835) — protocolized care vs usual care in early septic shock",
@@ -167,9 +173,15 @@
       "DECRA (NCT00155987) — early decompressive craniectomy in severe TBI",
       "Hypertonic-TBI (NCT00316004) — hypertonic saline resuscitation in severe TBI",
       "PEITHO-3 (NCT04430569) — reduced-dose alteplase vs placebo in intermediate high-risk PE",
-      "Burns-FFP (NCT05069922) — FFP vs albumin in acute burn resuscitation"
+      "Burns-FFP (NCT05069922) — FFP vs albumin in acute burn resuscitation",
+      "SHOCK Trial (NCT00000552) — emergent revascularization vs medical stabilization in cardiogenic shock",
+      "LEVOSIMENDAN-ECMO (NCT04728932) — levosimendan vs placebo for ECMO weaning in cardiogenic shock",
+      "SOAP-II (NCT00314704) — dopamine vs norepinephrine as first vasopressor in shock (includes cardiogenic)",
+      "RIC-Hemorrhage (NCT02071290) — remote ischemic conditioning in hemorrhagic shock trauma",
+      "HSL-Hemorrhage (NCT01433276) — hypertonic sodium lactate vs Ringer's lactate in hemorrhagic shock",
+      "DKA-Fluids (NCT05808972) — NaCl 0.9% vs Ringer's lactate in severe DKA"
     ],
-    "version": "2.0",
-    "verified_utc": "2026-02-14T12:00:00Z"
+    "version": "3.0",
+    "verified_utc": "2026-02-14T18:00:00Z"
   }
 }

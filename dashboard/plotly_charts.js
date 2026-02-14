@@ -632,8 +632,8 @@ const PlotlyCharts = (() => {
     });
   }
 
-  // ── 9. Interactive Forest Plot (NEW) ──────────────────────────────
-  function renderForestPlot(containerId, rows) {
+  // ── 9. Keyword Signal Bars ──────────────────────────────
+  function renderKeywordBars(containerId, rows) {
     const el = document.getElementById(containerId);
     if (!el || typeof Plotly === "undefined") return;
     if (!rows || rows.length === 0) { el.textContent = "No data."; return; }
@@ -696,7 +696,7 @@ const PlotlyCharts = (() => {
     const median = [...studyCounts].sort((a, b) => a - b)[Math.floor(studyCounts.length / 2)];
 
     const layout = {
-      ...defaultLayout("Keyword Evidence Forest"),
+      ...defaultLayout("Keyword Signal Bars"),
       xaxis: { title: "Number of studies", gridcolor: tc.gridColor },
       yaxis: { automargin: true, tickfont: { size: 11 }, autorange: "reversed" },
       margin: { t: 50, b: 50, l: 180, r: 20 },
@@ -711,7 +711,7 @@ const PlotlyCharts = (() => {
     };
 
     safePlot(el, data, layout, defaultConfig).then(() => {
-      addExportToolbar("forestPlot", containerId);
+      addExportToolbar("keywordBars", containerId);
       el.on("plotly_click", (d) => {
         if (d.points && d.points[0]) emitFilter("keyword", d.points[0].y);
       });
@@ -892,7 +892,7 @@ const PlotlyCharts = (() => {
     renderPrismaFlow,
     renderNetwork,
     renderBubbleMatrix,
-    renderForestPlot,
+    renderKeywordBars,
     renderSankey,
     renderRadar,
     // Expose for theme change re-render

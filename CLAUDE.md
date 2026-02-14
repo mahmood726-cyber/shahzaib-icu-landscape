@@ -5,7 +5,7 @@ CT.gov ICU RCT living trial landscape map: **fetch → enrich → build → dash
 
 ## Pipeline Steps
 1. **Fetch**: CT.gov API search for ICU RCTs → raw JSON
-2. **Enrich**: 8 sources (PubMed, FAERS, OpenAlex, etc.) → enriched records
+2. **Enrich**: 7 adapters (PubMed, FAERS, OpenAlex, Crossref, Europe PMC, Unpaywall, OpenCitations) → enriched records
 3. **Build**: Aggregate, categorize, validate → structured trial landscape
 4. **Dashboard**: Interactive HTML with filters, bar charts, PRISMA flow
 

@@ -1644,7 +1644,7 @@ const getFilteredChartRows = (rows) => {
 const buildChartRegistry = (summary, chartRows) => ({
   prismaFlowChart: () => PlotlyCharts.renderPrismaFlow("prismaFlowChart", summary),
   bubbleMatrixChart: () => PlotlyCharts.renderBubbleMatrix("bubbleMatrixChart", chartRows, summary),
-  forestPlotChart: () => PlotlyCharts.renderForestPlot("forestPlotChart", chartRows),
+  keywordBarsChart: () => PlotlyCharts.renderKeywordBars("keywordBarsChart", chartRows),
   treemapChart: () => PlotlyCharts.renderTreemap("treemapChart", summary),
   sunburstChart: () => PlotlyCharts.renderSunburst("sunburstChart", summary),
   heatmapChart: () => PlotlyCharts.renderHeatmap("heatmapChart", chartRows),
@@ -1656,7 +1656,7 @@ const buildChartRegistry = (summary, chartRows) => ({
 });
 
 // Above-fold charts render immediately; below-fold charts defer to IntersectionObserver
-const ABOVE_FOLD_CHARTS = new Set(["prismaFlowChart", "bubbleMatrixChart", "forestPlotChart"]);
+const ABOVE_FOLD_CHARTS = new Set(["prismaFlowChart", "bubbleMatrixChart", "keywordBarsChart"]);
 
 const renderPlotlyCharts = (summary, rows) => {
   if (typeof PlotlyCharts === "undefined") return;
@@ -1739,7 +1739,7 @@ const TOUR_STEPS = [
   { selector: ".cards", title: "Summary statistics", text: "Key metrics for the trial landscape. Animated counters show totals at a glance.", position: "bottom" },
   { selector: ".focus-bar", title: "Filters", text: "Focus on specific conditions or switch between study count and mention count.", position: "bottom" },
   { selector: "#bubbleMatrixChart", title: "Evidence bubble matrix", text: "Flagship visualization: interventions vs outcomes. Bubble size = studies, color = placebo proportion. Click to filter.", position: "top" },
-  { selector: "#forestPlotChart", title: "Keyword signal bars", text: "Study count per keyword. Bar color reflects design variability (exploratory indicator, not statistical heterogeneity).", position: "top" },
+  { selector: "#keywordBarsChart", title: "Keyword signal bars", text: "Study count per keyword. Bar color reflects measurement density (exploratory indicator, not statistical heterogeneity).", position: "top" },
   { selector: "#choroplethChart", title: "World map", text: "Geographic distribution of ICU trials. Click a country to filter all charts.", position: "top" },
   { selector: "#timeSeriesChart", title: "Timeline", text: "Trial registrations over time. Toggle cumulative view in the legend.", position: "top" },
   { selector: "#resultsTable", title: "Data table", text: "Browse individual study outcomes. Click a row to see full details in the sidebar.", position: "top" },
