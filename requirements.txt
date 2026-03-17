@@ -1,3 +1,4 @@
 # ICU Living Trial Landscape — Python dependencies
-# Core pipeline uses stdlib only, but ctgov-search-strategies tooling requires:
+# Requires Python >= 3.10 (tested on 3.13)
 requests>=2.28
+pyarrow>=14.0

@@ -5,3 +5,9 @@ raw/
 *.pyc
 enrichment/*.sqlite
 enrichment/*.csv
+dashboard/data/*.csv
+dashboard/data/*.parquet
+dashboard/lib/plotly.min.js
+*.docx
+CLAUDE.md
+.serena/

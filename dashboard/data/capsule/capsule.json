@@ -1,0 +1,195 @@
+{
+  "capsule_id": "TC-broad-20260214T142400925798Z",
+  "generated_utc": "2026-02-14T14:24:00.925798+00:00",
+  "pipeline_version": "2bfdaae",
+  "machine_id": "host:7f414ba8ccb9",
+  "python_version": "3.13.7",
+  "ontology_version": "sha256:acc4d9ae21e72b9b777ade202b046517adf05dcc08cfa64999d7669c80e16649",
+  "ontology_semantic_version": "v2.0 — added fluid responsiveness, echo params, resuscitation endpoints, ICU severity score separation, HR/SV negative context, milrinone/levosimendan, tissue perfusion specificity",
+  "input_hashes": {
+    "icu_rct_broad_studies.csv": "sha256:19721246f6bc7956ca83815d50a98d5e18ed277865585163d505f2d4241234e0",
+    "icu_rct_broad_hemodynamic_mentions.csv": "sha256:ed1a29901c0604d4d0ee699877e5923bb4c25754046c68374341b9fa1beb761c",
+    "pubmed_icu_hemo.csv": "sha256:8dbb4e9f78adb439136183ca4a7185036244b960a8b1f82248034f6d698c3d88"
+  },
+  "output_hashes": {
+    "icu_hemodynamic_living_map.csv": "sha256:3ac6d55e3d6a9d77ac9c6de284b12be9c9c29f7390908f732c719e8cd810dd93",
+    "icu_hemodynamic_summary.json": "sha256:548bd00203ef19ec87d37d6ae06a557b3ab90bd170e403809845ee224f63fa4d"
+  },
+  "validations": [
+    {
+      "rule_id": "P0-schema-studies",
+      "severity": "P0",
+      "passed": true,
+      "message": "Studies CSV has all 28 expected columns"
+    },
+    {
+      "rule_id": "P0-schema-hemo",
+      "severity": "P0",
+      "passed": true,
+      "message": "Hemo CSV has all 6 expected columns"
+    },
+    {
+      "rule_id": "P0-schema-output",
+      "severity": "P0",
+      "passed": true,
+      "message": "Output CSV has all 30 expected columns"
+    },
+    {
+      "rule_id": "P0-summary-totals",
+      "severity": "P0",
+      "passed": true,
+      "message": "All 9 summary total fields are valid non-negative integers"
+    },
+    {
+      "rule_id": "P0-nct-format",
+      "severity": "P0",
+      "passed": true,
+      "message": "All 39926 sampled trial IDs are valid (24046 NCT, 15880 other registries)"
+    },
+    {
+      "rule_id": "P0-total-consistency",
+      "severity": "P0",
+      "passed": true,
+      "message": "Mention totals consistent: 39926 = 7199+32727 = 37171+2755"
+    },
+    {
+      "rule_id": "P1-referential-integrity",
+      "severity": "P1",
+      "passed": false,
+      "message": "5470 hemo NCT ID(s) not found in studies CSV (orphan rows with blank metadata)"
+    },
+    {
+      "rule_id": "P1-keyword-coverage",
+      "severity": "P1",
+      "passed": true,
+      "message": "35/35 config keywords found (100%); threshold 80%"
+    },
+    {
+      "rule_id": "P1-normalization-coverage",
+      "severity": "P1",
+      "passed": true,
+      "message": "0/39926 mentions unmapped (0.0%); threshold 5%"
+    },
+    {
+      "rule_id": "P1-unit-coverage",
+      "severity": "P1",
+      "passed": true,
+      "message": "5376/39926 mentions unspecified (13.5%); threshold 40%"
+    },
+    {
+      "rule_id": "P1-empty-summary-sections",
+      "severity": "P1",
+      "passed": true,
+      "message": "All 5 summary sections are non-empty"
+    },
+    {
+      "rule_id": "P2-ontology-version-logged",
+      "severity": "P2",
+      "passed": true,
+      "message": "Ontology version: sha256:acc4d9ae21e72b9b7..."
+    },
+    {
+      "rule_id": "P2-raw-input-hashed",
+      "severity": "P2",
+      "passed": true,
+      "message": "3 input file(s) hashed"
+    },
+    {
+      "rule_id": "P2-parquet-generated",
+      "severity": "P2",
+      "passed": true,
+      "message": "Parquet generated via pyarrow"
+    },
+    {
+      "rule_id": "P2-search-quality",
+      "severity": "P2",
+      "passed": true,
+      "message": "PRESS score 0.83 (acceptable) — indicative only (PRESS designed for bibliographic DBs, not registry queries)"
+    },
+    {
+      "rule_id": "P2-recall-reference",
+      "severity": "P2",
+      "passed": true,
+      "message": "20/21 reference-standard NCT IDs found (95%); missed: ['NCT03469947']"
+    },
+    {
+      "rule_id": "P1-enrollment-plausibility",
+      "severity": "P1",
+      "passed": false,
+      "message": "793 implausible enrollment(s): NCT01403428: enrollment=0 (ACTUAL); NCT06246045: enrollment=0 (ACTUAL); NCT01612091: enrollment=0 (ACTUAL); NCT02336308: enrollment=0 (ACTUAL); NCT02113735: enrollment=0 (ACTUAL)"
+    },
+    {
+      "rule_id": "P1-multi-source-coverage",
+      "severity": "P1",
+      "passed": false,
+      "message": "1/2 primary sources active (CT.gov=22054, PubMed=0); threshold 2"
+    },
+    {
+      "rule_id": "P1-dedup-integrity",
+      "severity": "P1",
+      "passed": true,
+      "message": "11981 unique trials checked — dedup consistent"
+    },
+    {
+      "rule_id": "P2-registry-diversity",
+      "severity": "P2",
+      "passed": true,
+      "message": "1 distinct registries represented (22054 total trials)"
+    }
+  ],
+  "badge": "bronze",
+  "badge_reasons": [
+    "3 P1 warning(s): ['P1-referential-integrity', 'P1-enrollment-plausibility', 'P1-multi-source-coverage']"
+  ],
+  "drift_events": [],
+  "abstentions": [],
+  "previous_capsule_id": null,
+  "enrichment_db_hash": null,
+  "search_strategy": {
+    "query_text": "AREA[StudyType]INTERVENTIONAL AND AREA[DesignAllocation]RANDOMIZED AND (\"intensive care\" OR \"critical care\" OR ICU OR \"intensive therapy unit\" OR \"high dependency unit\" OR \"critical illness\" OR \"mechanical ventilation\" OR ventilator OR \"septic shock\" OR \"vasopressor\" OR ARDS OR \"acute respiratory distress\" OR \"respiratory failure\" OR \"cardiogenic shock\" OR \"hemorrhagic shock\" OR \"haemorrhagic shock\" OR ECMO OR \"extracorporeal membrane oxygenation\" OR \"multi-organ failure\" OR \"organ dysfunction\" OR CCU OR MICU OR SICU OR PICU OR NICU OR \"traumatic brain injury\" OR TBI OR \"cardiac arrest\" OR \"post-cardiac arrest\" OR \"targeted temperature management\" OR \"therapeutic hypothermia\" OR \"major burns\" OR \"burn resuscitation\" OR \"major trauma\" OR \"pulmonary embolism\" OR \"diabetic ketoacidosis\" OR DKA OR \"acute liver failure\" OR \"status epilepticus\")",
+    "database": "ClinicalTrials.gov",
+    "limitations": [
+      "ClinicalTrials.gov only — trials registered only on other registries (EUCTR, ISRCTN, ANZCTR, ChiCTR, etc.) are not captured",
+      "Free-text search — no MeSH structured field queries (CT.gov v2 does not support AREA[ConditionSearch] with MeSH)",
+      "All study statuses included (recruiting, completed, withdrawn, terminated) — filter by status in downstream analysis",
+      "Geographic bias toward US-centric and industry-sponsored trials due to CT.gov registration patterns"
+    ],
+    "recall_reference_nct_ids": [
+      "NCT00510835",
+      "NCT00975793",
+      "NCT01149278",
+      "NCT00147004",
+      "NCT03078712",
+      "NCT00670254",
+      "NCT02338843",
+      "NCT00299650",
+      "NCT01470703",
+      "NCT02908308",
+      "NCT00878644",
+      "NCT00155987",
+      "NCT00316004",
+      "NCT04430569",
+      "NCT05069922",
+      "NCT00000552",
+      "NCT04728932",
+      "NCT00314704",
+      "NCT03469947",
+      "NCT01433276",
+      "NCT05808972"
+    ],
+    "grey_literature_note": "ClinicalTrials.gov and PubMed are searched. Trials registered exclusively on EUCTR, ISRCTN, ANZCTR, ChiCTR, or other registries without PubMed publications are not captured."
+  },
+  "_summary_totals": {
+    "total_studies": 22054,
+    "studies_with_placebo": 6204,
+    "studies_with_hemo_mentions": 11981,
+    "studies_with_hemo_and_placebo": 1996,
+    "total_hemo_mentions": 39926,
+    "core_hemo_mentions": 37171,
+    "adjunct_mentions": 2755,
+    "adjunct_note": "ICU Severity Score, Ventilation duration, Resuscitation Endpoints, and Vasopressor-free days are non-hemodynamic adjuncts reported separately",
+    "placebo_hemo_mentions": 7199,
+    "non_placebo_hemo_mentions": 32727,
+    "orphan_hemo_nct_ids": 5470
+  }
+}
