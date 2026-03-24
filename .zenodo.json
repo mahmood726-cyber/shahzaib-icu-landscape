@@ -1,0 +1,36 @@
+{
+  "title": "ICU Hemodynamic Trial Landscape",
+  "description": "Zenodo release metadata for the ICU Hemodynamic Trial Landscape software package stored under C:/Models/shahzaib-icu-landscape. Mint the DOI from the next public GitHub release and then update the F1000 software-availability section to cite the resulting archive record.",
+  "upload_type": "software",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Ahmad, Mahmood",
+      "affiliation": "Royal Free Hospital"
+    },
+    {
+      "name": "Kumar, Niraj",
+      "affiliation": "Royal Free Hospital"
+    },
+    {
+      "name": "Dar, Bilaal",
+      "affiliation": "King's College Medical School"
+    },
+    {
+      "name": "Khan, Laiba",
+      "affiliation": "Royal Free Hospital"
+    },
+    {
+      "name": "Woo, Andrew",
+      "affiliation": "St George's Medical School"
+    }
+  ],
+  "keywords": [
+    "ICU Hemodynamic Trial Landscape",
+    "shahzaib-icu-landscape",
+    "software",
+    "reproducibility",
+    "F1000Research"
+  ],
+  "notes": "Prepared locally to reduce DOI-minting friction for the F1000 submission bundle."
+}

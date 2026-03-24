@@ -1071,5 +1071,81 @@ async function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 </script>
+<script>
+window.__webrValidationConfig = {
+  appName: 'Hemodynamic Trial Insights',
+  intro: 'Checks the placebo-opportunity table and the priority ranking table after the analytical dashboard loads.',
+  async ready(h) {
+    await h.waitFor(
+      () => h.text('#generatedAt') !== 'Loading...' && document.querySelectorAll('#priorityTable tbody tr').length > 0,
+      15000
+    );
+  },
+  tests: [
+    {
+      name: 'Opportunity table percentages and tiers remain consistent with the counts',
+      collect() {
+        const rows = Array.from(document.querySelectorAll('#opportunityTable tbody tr')).map((row) => {
+          const cells = row.querySelectorAll('td');
+          return {
+            total: Number(cells[1].textContent.replace(/,/g, '').trim()),
+            placebo: Number(cells[2].textContent.replace(/,/g, '').trim()),
+            pct: Number(cells[3].textContent.replace('%', '').trim()),
+            tier: cells[4].textContent.trim(),
+          };
+        });
+        return {
+          totals: rows.map((row) => row.total),
+          placebo: rows.map((row) => row.placebo),
+          pct: rows.map((row) => row.pct),
+          tier: rows.map((row) => row.tier),
+        };
+      },
+      r(payload, h) {
+        return `
+totals <- c(${payload.totals.join(', ')})
+placebo <- c(${payload.placebo.join(', ')})
+pct <- c(${payload.pct.join(', ')})
+tier <- ${h.rVector(payload.tier)}
+expected_pct <- round(placebo / totals * 100, 1)
+expected_tier <- ifelse(placebo >= 100, "Strong", ifelse(placebo >= 20, "Moderate", "Weak"))
+if (all(abs(expected_pct - pct) < 0.11) && all(expected_tier == tier)) {
+  "PASS|Opportunity-table placebo percentages and tier labels match the underlying counts."
+} else {
+  "FAIL|One or more opportunity-table percentages or tier labels no longer match the displayed counts."
+}`.trim();
+      }
+    },
+    {
+      name: 'Priority rankings stay sequential and sorted by composite score',
+      collect() {
+        const rows = Array.from(document.querySelectorAll('#priorityTable tbody tr')).map((row) => {
+          const cells = row.querySelectorAll('td');
+          return {
+            rank: Number(cells[0].textContent.trim()),
+            composite: Number(cells[2].textContent.trim()),
+          };
+        });
+        return {
+          ranks: rows.map((row) => row.rank),
+          composite: rows.map((row) => row.composite),
+        };
+      },
+      r(payload) {
+        return `
+ranks <- c(${payload.ranks.join(', ')})
+composite <- c(${payload.composite.join(', ')})
+expected_ranks <- seq_along(ranks)
+if (all(ranks == expected_ranks) && all(diff(composite) <= 1e-8)) {
+  "PASS|Priority rankings are sequential and remain sorted by descending composite score."
+} else {
+  "FAIL|The priority table is no longer sequentially ranked or sorted by descending composite score."
+}`.trim();
+      }
+    }
+  ]
+};
+</script>
+<script src="../../_shared/webr-validation.js"></script>
 </body>
 </html>

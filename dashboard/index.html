@@ -600,5 +600,84 @@
 
   <script src="plotly_charts.js" defer></script>
   <script src="app.js" defer></script>
+  <script>
+    window.__webrValidationConfig = {
+      appName: 'ICU Hemodynamic Trial Landscape',
+      intro: 'Checks that the headline mention counts and placebo split remain internally consistent after the dashboard data load.',
+      async ready(h) {
+        await h.waitFor(() => h.text('#generatedAt') !== 'Loading...' && h.parseNumber(h.text('#totalStudies')) > 0, 15000);
+      },
+      tests: [
+        {
+          name: 'Core and adjunct mentions sum to the displayed total mentions',
+          collect(h) {
+            return {
+              total: h.parseNumber(h.text('#totalMentions')),
+              core: h.parseNumber(h.text('#coreHemoMentions')),
+              adjunct: h.parseNumber(h.text('#adjunctMentions')),
+            };
+          },
+          r(payload) {
+            return `
+total <- ${payload.total}
+core <- ${payload.core}
+adjunct <- ${payload.adjunct}
+if ((core + adjunct) == total) {
+  "PASS|Core and adjunct mention counts sum to the displayed total mentions."
+} else {
+  paste0("FAIL|Core + adjunct mentions = ", core + adjunct, " but the dashboard reports ", total, " total mentions.")
+}`.trim();
+          }
+        },
+        {
+          name: 'Headline trial counts remain logically ordered',
+          collect(h) {
+            return {
+              totalStudies: h.parseNumber(h.text('#totalStudies')),
+              hemoStudies: h.parseNumber(h.text('#hemoStudies')),
+              placeboStudies: h.parseNumber(h.text('#placeboStudies')),
+              hemoPlaceboStudies: h.parseNumber(h.text('#hemoPlaceboStudies')),
+            };
+          },
+          r(payload) {
+            return `
+total_studies <- ${payload.totalStudies}
+hemo_studies <- ${payload.hemoStudies}
+placebo_studies <- ${payload.placeboStudies}
+hemo_placebo_studies <- ${payload.hemoPlaceboStudies}
+checks <- c(
+  total_studies >= hemo_studies,
+  total_studies >= placebo_studies,
+  hemo_studies >= hemo_placebo_studies,
+  placebo_studies >= hemo_placebo_studies
+)
+if (all(checks)) {
+  "PASS|The headline trial counts retain the expected subset ordering."
+} else {
+  "FAIL|The headline trial counts no longer satisfy the expected total / subset ordering."
+}`.trim();
+          }
+        },
+        {
+          name: 'Explorer table renders at least one row after data load',
+          collect() {
+            return {
+              rows: document.querySelectorAll('#resultsTable tbody tr').length,
+            };
+          },
+          r(payload) {
+            return `
+rows <- ${payload.rows}
+if (rows > 0) {
+  "PASS|The explorer table rendered rows after the dataset load."
+} else {
+  "FAIL|The explorer table is empty after the dataset load."
+}`.trim();
+          }
+        }
+      ]
+    };
+  </script>
+  <script src="../../_shared/webr-validation.js"></script>
 </body>
 </html>
