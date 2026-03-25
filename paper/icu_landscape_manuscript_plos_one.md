@@ -2,11 +2,11 @@
 
 **Shahzaib Ahmad**^1^
 
-^1^ [AFFILIATION_PLACEHOLDER]
+^1^ Royal Free Hospital, London, UK
 
-**Corresponding author:** Shahzaib Ahmad, [EMAIL_PLACEHOLDER]
+**Corresponding author:** Shahzaib Ahmad, mahmood.ahmad2@nhs.net
 
-ORCID: [ORCID_PLACEHOLDER]
+ORCID: 0009-0003-7781-4478
 
 ---
 
