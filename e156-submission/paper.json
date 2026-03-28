@@ -1,0 +1,96 @@
+{
+  "title": "ICU Hemodynamic Trial Landscape: A Living Evidence Map",
+  "slug": "icu-hemodynamic-landscape",
+  "author": "Mahmood Ahmad",
+  "date": "2026-03-26",
+  "body": "Can a browser-based living evidence map provide reviewer-auditable trial landscape coverage for intensive care hemodynamic research? We built a pipeline that fetches ICU randomized controlled trials from ClinicalTrials.gov, enriches records via seven adapters including PubMed, OpenAlex, and FAERS, and renders two interactive dashboards with evidence-gap visualizations and PRISMA-style flow diagrams. The system uses keyword normalization, placebo-arm classification, deduplication validation, and incremental merge logic with a living update log recording every refresh cycle and its provenance metadata. Against a 21-trial reference standard for hemodynamic ICU interventions, the pipeline achieved sensitivity of 100 percent (95% CI 83.9-100) with all trials correctly classified. Stratified keyword-validation samples and deduplication checks confirmed consistent categorization across intervention classes, phases, and enrollment status. The platform serves as a descriptive evidence-mapping tool making registration coverage and signal gaps inspectable without requiring users to engage with code. However, the limitation of registry-only data means that unpublished results and non-registered trials remain invisible to this approach.",
+  "word_count": 156,
+  "sentence_count": 7,
+  "sentences": [
+    {
+      "role": "Question",
+      "text": "Can a browser-based living evidence map provide reviewer-auditable trial landscape coverage for intensive care hemodynamic research?"
+    },
+    {
+      "role": "Dataset",
+      "text": "We built a pipeline that fetches ICU randomized controlled trials from ClinicalTrials.gov, enriches records via seven adapters including PubMed, OpenAlex, and FAERS, and renders two interactive dashboards with evidence-gap visualizations and PRISMA-style flow diagrams."
+    },
+    {
+      "role": "Method",
+      "text": "The system uses keyword normalization, placebo-arm classification, deduplication validation, and incremental merge logic with a living update log recording every refresh cycle and its provenance metadata."
+    },
+    {
+      "role": "Primary result",
+      "text": "Against a 21-trial reference standard for hemodynamic ICU interventions, the pipeline achieved sensitivity of 100 percent (95% CI 83.9-100) with all trials correctly classified."
+    },
+    {
+      "role": "Robustness",
+      "text": "Stratified keyword-validation samples and deduplication checks confirmed consistent categorization across intervention classes, phases, and enrollment status."
+    },
+    {
+      "role": "Interpretation",
+      "text": "The platform serves as a descriptive evidence-mapping tool making registration coverage and signal gaps inspectable without requiring users to engage with code."
+    },
+    {
+      "role": "Boundary",
+      "text": "However, the limitation of registry-only data means that unpublished results and non-registered trials remain invisible to this approach."
+    }
+  ],
+  "notes": {
+    "app": "ICU Trial Landscape v1.0",
+    "data": "ClinicalTrials.gov ICU RCTs, 21-trial reference standard",
+    "code": "https://github.com/mahmood726-cyber/shahzaib-icu-landscape",
+    "doi": "",
+    "version": "1.0",
+    "date": "2026-03-26",
+    "validation": "DRAFT"
+  },
+  "type": "methods",
+  "primary_estimand": "Sensitivity",
+  "validation": {
+    "status": "pass",
+    "checks": [
+      {
+        "name": "single paragraph",
+        "ok": true,
+        "detail": "Body must not contain blank-line paragraph breaks."
+      },
+      {
+        "name": "sentence count",
+        "ok": true,
+        "detail": "Found 7 sentences."
+      },
+      {
+        "name": "word count",
+        "ok": true,
+        "detail": "Found 156 words."
+      },
+      {
+        "name": "no headings",
+        "ok": true,
+        "detail": "No markdown headings allowed in body."
+      },
+      {
+        "name": "no links",
+        "ok": true,
+        "detail": "No links or DOI links allowed in body."
+      },
+      {
+        "name": "result sentence has interval",
+        "ok": true,
+        "detail": "Sentence 4 should include a confidence interval."
+      },
+      {
+        "name": "result sentence has estimand",
+        "ok": true,
+        "detail": "Sentence 4 should name an effect measure or test metric."
+      },
+      {
+        "name": "boundary sentence present",
+        "ok": true,
+        "detail": "Sentence 7 should express a limitation, harm, or scope boundary."
+      }
+    ]
+  },
+  "schema": "e156-v0.2"
+}
