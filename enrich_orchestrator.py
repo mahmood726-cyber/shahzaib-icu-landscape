@@ -25,7 +25,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_DB_PATH = ROOT / "enrichment" / "enrichment_db.sqlite"
@@ -49,7 +49,7 @@ def init_db(db_path: Path) -> None:
         conn.close()
 
 
-def load_config(config_path: Path) -> Dict[str, Any]:
+def load_config(config_path: Path) -> dict[str, Any]:
     """Load enrichment configuration.
 
     The global ``email`` field (used by polite-pool APIs like Unpaywall,
@@ -57,7 +57,7 @@ def load_config(config_path: Path) -> Dict[str, Any]:
       1. ``ENRICHMENT_EMAIL`` environment variable, then
       2. the ``email`` key in the config JSON.
     """
-    default: Dict[str, Any] = {"sources": {}, "max_age_days": 30, "email": ""}
+    default: dict[str, Any] = {"sources": {}, "max_age_days": 30, "email": ""}
     if not config_path.exists():
         cfg = default
     else:
@@ -103,9 +103,9 @@ def load_config(config_path: Path) -> Dict[str, Any]:
 _NCT_RE = re.compile(r"^NCT\d{8}$")
 
 
-def load_trials(studies_csv: Path, db_path: Path, limit: Optional[int] = None) -> List[Dict[str, str]]:
+def load_trials(studies_csv: Path, db_path: Path, limit: int | None = None) -> list[dict[str, str]]:
     """Load trial NCT IDs from studies CSV and populate the trials table."""
-    trials: List[Dict[str, str]] = []
+    trials: list[dict[str, str]] = []
     with studies_csv.open("r", encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
@@ -148,11 +148,11 @@ def load_trials(studies_csv: Path, db_path: Path, limit: Optional[int] = None) -
 class EnrichmentOrchestrator:
     """Orchestrates multi-source enrichment with dependency chain."""
 
-    def __init__(self, db_path: Path, config: Dict[str, Any]) -> None:
+    def __init__(self, db_path: Path, config: dict[str, Any]) -> None:
         self.db_path = db_path
         self.config = config
-        self._adapters: Dict[str, Any] = {}
-        self._conn: Optional[sqlite3.Connection] = None
+        self._adapters: dict[str, Any] = {}
+        self._conn: sqlite3.Connection | None = None
 
     def _get_conn(self) -> sqlite3.Connection:
         """Return a reusable SQLite connection (avoids open/close churn)."""
@@ -169,10 +169,10 @@ class EnrichmentOrchestrator:
             self._conn = None
 
     def _load_adapters(
-        self, source_names: List[str], effective_config: Optional[Dict[str, Any]] = None,
+        self, source_names: list[str], effective_config: dict[str, Any] | None = None,
     ) -> None:
         """Lazy-load requested adapters."""
-        from sources import get_adapter, SOURCE_PHASES
+        from sources import get_adapter
         cfg = effective_config or self.config
         for name in source_names:
             if name not in self._adapters:
@@ -182,10 +182,10 @@ class EnrichmentOrchestrator:
     def run(
         self,
         studies_csv: Path,
-        sources: Optional[List[str]] = None,
-        max_age_days: Optional[int] = None,
-        nct_limit: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        sources: list[str] | None = None,
+        max_age_days: int | None = None,
+        nct_limit: int | None = None,
+    ) -> dict[str, Any]:
         """Run enrichment pipeline."""
         from sources import SOURCE_PHASES
 
@@ -247,7 +247,7 @@ class EnrichmentOrchestrator:
         # sources assigned to phase 3+ (e.g., openfda).
         all_phases = sorted(set(SOURCE_PHASES[s] for s in enabled))
 
-        stats: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        stats: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         for phase_num in all_phases:
             phase_sources = sorted([s for s in enabled if SOURCE_PHASES[s] == phase_num])
@@ -278,22 +278,22 @@ class EnrichmentOrchestrator:
         print(f"\nEnrichment complete: {len(nct_ids)} trials, {len(enabled)} sources.")
         return summary
 
-    def get_enrichment_summary(self, nct_id: str) -> Dict[str, Any]:
+    def get_enrichment_summary(self, nct_id: str) -> dict[str, Any]:
         """Get enrichment summary for a single trial (for dashboard)."""
         conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         return self._enrichment_for_nct(conn, nct_id)
 
-    def get_enrichment_summaries(self, nct_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    def get_enrichment_summaries(self, nct_ids: list[str]) -> dict[str, dict[str, Any]]:
         """Batch enrichment summaries — single DB connection for all NCT IDs."""
         conn = self._get_conn()
         conn.row_factory = sqlite3.Row
         return {nct_id: self._enrichment_for_nct(conn, nct_id) for nct_id in nct_ids}
 
     @staticmethod
-    def _enrichment_for_nct(conn: sqlite3.Connection, nct_id: str) -> Dict[str, Any]:
+    def _enrichment_for_nct(conn: sqlite3.Connection, nct_id: str) -> dict[str, Any]:
         """Build enrichment summary for one NCT ID using an existing connection."""
-        summary: Dict[str, Any] = {"nct_id": nct_id, "sources": []}
+        summary: dict[str, Any] = {"nct_id": nct_id, "sources": []}
 
         # Publications
         pubs = conn.execute(
@@ -364,13 +364,13 @@ class EnrichmentOrchestrator:
 
     def export_dashboard_enrichment(
         self,
-        nct_ids: List[str],
+        nct_ids: list[str],
         output_path: Path,
     ) -> None:
         """Export per-trial enrichment summaries as JSON for the dashboard."""
         # Use batch method to avoid N+1 DB connections (R7-P0-1)
         enrichment = self.get_enrichment_summaries(nct_ids)
-        coverage: Dict[str, int] = defaultdict(int)
+        coverage: dict[str, int] = defaultdict(int)
 
         for nct_id, summary in enrichment.items():
             for source in summary.get("enrichment_sources", []):
@@ -388,7 +388,7 @@ class EnrichmentOrchestrator:
         tmp.replace(output_path)
         print(f"Enrichment summary exported to {output_path}")
 
-    def _start_run(self, sources: List[str], nct_count: int) -> int:
+    def _start_run(self, sources: list[str], nct_count: int) -> int:
         now = datetime.now(timezone.utc).isoformat()
         conn = self._get_conn()
         cursor = conn.execute(
@@ -410,7 +410,7 @@ class EnrichmentOrchestrator:
         conn.commit()
 
     @staticmethod
-    def _print_source_stats(source_name: str, counts: Dict[str, int]) -> None:
+    def _print_source_stats(source_name: str, counts: dict[str, int]) -> None:
         parts = [f"{k}={v}" for k, v in sorted(counts.items())]
         print(f"    [{source_name}] done: {', '.join(parts)}")
 

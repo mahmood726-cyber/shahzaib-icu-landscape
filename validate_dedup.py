@@ -16,10 +16,8 @@ import argparse
 import csv
 import random
 import re
-import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Set
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "output"
@@ -44,7 +42,7 @@ def _levenshtein_sim(a: str, b: str) -> float:
     return 1.0 - prev[len(a)] / max(len(a), len(b))
 
 
-def _words(s: str) -> Set[str]:
+def _words(s: str) -> set[str]:
     return {w for w in re.split(r'\W+', s.lower()) if len(w) >= 4}
 
 
@@ -63,7 +61,7 @@ def main():
     print(f"CT.gov: {len(ctgov):,} | PubMed: {len(pubmed):,}")
 
     # Index CT.gov by NCT ID
-    ct_by_id: Dict[str, Dict] = {s["nct_id"]: s for s in ctgov if s.get("nct_id")}
+    ct_by_id: dict[str, dict] = {s["nct_id"]: s for s in ctgov if s.get("nct_id")}
 
     # Split PubMed: those with NCT IDs (potential merges) vs those without
     pm_with_nct = [r for r in pubmed if r.get("nct_id", "").startswith("NCT")]
@@ -98,7 +96,7 @@ def main():
 
     # --- Part 2: Unmerged PubMed records — find closest CT.gov by title ---
     # Build word inverted index for fast candidate retrieval
-    word_idx: Dict[str, List[str]] = defaultdict(list)
+    word_idx: dict[str, list[str]] = defaultdict(list)
     for s in ctgov:
         nid = s.get("nct_id", "")
         for w in _words(s.get("brief_title", "")):
@@ -109,7 +107,7 @@ def main():
     pm_candidates = pm_without_nct[:min(500, len(pm_without_nct))]
 
     # Pre-compute CT.gov title words
-    ct_words_cache: Dict[str, Set[str]] = {}
+    ct_words_cache: dict[str, set[str]] = {}
     for s in ctgov:
         nid = s.get("nct_id", "")
         ct_words_cache[nid] = _words(s.get("brief_title", ""))
@@ -122,7 +120,7 @@ def main():
             continue
 
         # Collect candidates via inverted index, count word hits
-        cand_hits: Dict[str, int] = defaultdict(int)
+        cand_hits: dict[str, int] = defaultdict(int)
         for w in pm_ws:
             for nid in word_idx.get(w, []):
                 cand_hits[nid] += 1
@@ -167,9 +165,9 @@ def main():
 
     print(f"Unmerged sample ({len(unmerged_sample)}): {unmerged_path}")
     print(f"\nSimilarity range in unmerged: {unmerged_sample[-1][2]:.3f} - {unmerged_sample[0][2]:.3f}")
-    print(f"\nReview instructions:")
-    print(f"  Merged: mark 'is_correct_merge' TRUE/FALSE")
-    print(f"  Unmerged: mark 'should_be_merged' TRUE/FALSE")
+    print("\nReview instructions:")
+    print("  Merged: mark 'is_correct_merge' TRUE/FALSE")
+    print("  Unmerged: mark 'should_be_merged' TRUE/FALSE")
 
 
 if __name__ == "__main__":

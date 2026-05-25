@@ -17,12 +17,11 @@ import re
 import sys
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
-from urllib.request import Request, urlopen
+from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.error import URLError, HTTPError
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "ctgov_icu_placebo_strategy.json"
@@ -50,7 +49,7 @@ def _normalize_quotes(s: str) -> str:
     return s.replace("\u2018", "'").replace("\u2019", "'").replace("\u2032", "'")
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f"Missing config: {CONFIG_PATH}")
     with CONFIG_PATH.open("r", encoding="utf-8") as fh:
@@ -121,7 +120,7 @@ def keyword_in_text(keyword: str, text: str) -> bool:
 
 def _eutils_get(
     endpoint: str,
-    params: Dict[str, str],
+    params: dict[str, str],
     timeout: int = 30,
     retries: int = 3,
     backoff: float = 2.0,
@@ -131,7 +130,7 @@ def _eutils_get(
     req = Request(url, headers={
         "User-Agent": "ICU-Living-Map/1.0 (research; OA-only)",
     })
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
     for attempt in range(retries):
         time.sleep(RATE_LIMIT)
         try:
@@ -149,7 +148,7 @@ def _eutils_get(
     raise last_error or RuntimeError(f"E-utilities request failed: {url}")
 
 
-def _build_pubmed_query(config: Dict[str, Any]) -> str:
+def _build_pubmed_query(config: dict[str, Any]) -> str:
     """Build PubMed search query for ICU RCTs with hemodynamic outcomes."""
     # ICU terms — harmonized with CT.gov query (ctgov_icu_placebo_strategy.json v4)
     icu_terms = [
@@ -182,10 +181,10 @@ def _build_pubmed_query(config: Dict[str, Any]) -> str:
 def esearch(
     query: str,
     retmax: int = DEFAULT_MAX_PMIDS,
-    updated_since: Optional[str] = None,
-) -> List[str]:
+    updated_since: str | None = None,
+) -> list[str]:
     """Search PubMed and return list of PMIDs."""
-    params: Dict[str, str] = {
+    params: dict[str, str] = {
         "db": "pubmed",
         "term": query,
         "retmax": str(retmax),
@@ -217,11 +216,11 @@ def esearch(
 
 
 def efetch_articles(
-    pmids: List[str],
+    pmids: list[str],
     batch_size: int = DEFAULT_EFETCH_BATCH,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Fetch article metadata from PubMed in batches."""
-    articles: List[Dict[str, Any]] = []
+    articles: list[dict[str, Any]] = []
 
     for i in range(0, len(pmids), batch_size):
         batch = pmids[i:i + batch_size]
@@ -250,7 +249,7 @@ def efetch_articles(
     return articles
 
 
-def _parse_article(article_el: ET.Element) -> Optional[Dict[str, Any]]:
+def _parse_article(article_el: ET.Element) -> dict[str, Any] | None:
     """Parse a PubmedArticle XML element into a dict."""
     medline = article_el.find(".//MedlineCitation")
     if medline is None:
@@ -336,10 +335,10 @@ def _parse_article(article_el: ET.Element) -> Optional[Dict[str, Any]]:
 
 
 def search_pubmed_primary(
-    hemo_keywords: List[str],
-    config: Dict[str, Any],
-    updated_since: Optional[str] = None,
-) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+    hemo_keywords: list[str],
+    config: dict[str, Any],
+    updated_since: str | None = None,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     """Search PubMed for ICU RCTs with hemodynamic outcomes.
 
     Returns (studies_rows, hemo_rows).
@@ -352,8 +351,8 @@ def search_pubmed_primary(
 
     articles = efetch_articles(pmids, batch_size=config.get("efetch_batch", DEFAULT_EFETCH_BATCH))
 
-    studies: List[Dict[str, str]] = []
-    hemo_mentions: List[Dict[str, str]] = []
+    studies: list[dict[str, str]] = []
+    hemo_mentions: list[dict[str, str]] = []
 
     for article in articles:
         # Check abstract for hemodynamic keywords
@@ -424,7 +423,7 @@ def search_pubmed_primary(
     return studies, hemo_mentions
 
 
-def write_csv(rows: List[Dict[str, str]], path: Path, fieldnames: List[str]) -> None:
+def write_csv(rows: list[dict[str, str]], path: Path, fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".csv.tmp")
     with tmp.open("w", encoding="utf-8", newline="") as fh:

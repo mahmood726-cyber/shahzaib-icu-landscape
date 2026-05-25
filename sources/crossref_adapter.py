@@ -6,8 +6,7 @@ to enriched publications.  Uses polite pool via mailto header.
 """
 from __future__ import annotations
 
-import sqlite3
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import quote
 
 from sources.base_adapter import BaseAdapter, FetchResult
@@ -15,12 +14,12 @@ from sources.base_adapter import BaseAdapter, FetchResult
 
 class CrossrefAdapter(BaseAdapter):
 
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         dois = self._get_trial_dois(nct_id)
         if not dois:
             return FetchResult(nct_id, self.source_name, "empty", records=0)
 
-        works: List[Dict[str, Any]] = []
+        works: list[dict[str, Any]] = []
         for doi in dois:
             work = self._get_work(doi)
             if work:
@@ -31,7 +30,7 @@ class CrossrefAdapter(BaseAdapter):
             return FetchResult(nct_id, self.source_name, "empty", records=0)
         return FetchResult(nct_id, self.source_name, "ok", records=len(works))
 
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         works = context.get("_crossref_works", [])
         if not works:
             return
@@ -59,7 +58,7 @@ class CrossrefAdapter(BaseAdapter):
         finally:
             conn.close()
 
-    def _get_trial_dois(self, nct_id: str) -> List[str]:
+    def _get_trial_dois(self, nct_id: str) -> list[str]:
         conn = self._get_conn()
         try:
             rows = conn.execute(
@@ -70,7 +69,7 @@ class CrossrefAdapter(BaseAdapter):
             conn.close()
         return [row[0] for row in rows]
 
-    def _get_work(self, doi: str) -> Dict[str, Any] | None:
+    def _get_work(self, doi: str) -> dict[str, Any] | None:
         """Fetch a single work by DOI from Crossref."""
         safe_doi = quote(doi, safe="")
         url = f"{self.config.base_url}/works/{safe_doi}"

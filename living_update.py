@@ -30,7 +30,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 LIVING_LOG_PATH = ROOT / "living_log.jsonl"
@@ -40,7 +40,7 @@ DASHBOARD_DIR = ROOT / "dashboard" / "data"
 LOG_DIR = ROOT / "logs"
 
 
-def _get_last_run_date() -> Optional[str]:
+def _get_last_run_date() -> str | None:
     """Read the last successful run date from living_log.jsonl."""
     if not LIVING_LOG_PATH.exists():
         return None
@@ -64,7 +64,7 @@ def _get_last_run_date() -> Optional[str]:
     return last_date
 
 
-def _append_log(entry: Dict[str, Any], max_entries: int = 200) -> None:
+def _append_log(entry: dict[str, Any], max_entries: int = 200) -> None:
     """Append a record to living_log.jsonl, rotating if it exceeds max_entries.
 
     Uses read-append-write-back approach to avoid race between append and rotate.
@@ -100,7 +100,7 @@ def _append_log(entry: Dict[str, Any], max_entries: int = 200) -> None:
             pass
 
 
-def _run_step(cmd: List[str], step_name: str, dry_run: bool = False) -> bool:
+def _run_step(cmd: list[str], step_name: str, dry_run: bool = False) -> bool:
     """Run a pipeline step. Returns True on success."""
     print(f"\n{'[DRY RUN] ' if dry_run else ''}Step: {step_name}", flush=True)
     print(f"  Command: {' '.join(cmd)}", flush=True)
@@ -145,7 +145,7 @@ def _find_python() -> str:
     return sys.executable
 
 
-def _backup_csv(path: Path) -> Optional[Path]:
+def _backup_csv(path: Path) -> Path | None:
     """Back up a CSV file before incremental fetch. Returns backup path or None."""
     if not path.exists():
         return None
@@ -157,7 +157,7 @@ def _backup_csv(path: Path) -> Optional[Path]:
 def _merge_incremental_csvs(
     query_name: str,
     output_dir: Path,
-    backups: Dict[str, Path],
+    backups: dict[str, Path],
 ) -> None:
     """Merge incremental fetch results into the backed-up full CSV files.
 
@@ -176,7 +176,7 @@ def _merge_incremental_csvs(
 
     # Read incremental studies to get the set of updated nct_ids
     incremental_studies_path = output_dir / csv_types["studies"]
-    updated_nct_ids: Set[str] = set()
+    updated_nct_ids: set[str] = set()
     if incremental_studies_path.exists():
         with incremental_studies_path.open("r", encoding="utf-8-sig", newline="") as fh:
             for row in csv.DictReader(fh):
@@ -192,7 +192,7 @@ def _merge_incremental_csvs(
                 if filename:
                     target = output_dir / filename
                     shutil.copy2(str(backup_path), str(target))
-        print(f"  Merge: no incremental updates, restored backups", flush=True)
+        print("  Merge: no incremental updates, restored backups", flush=True)
         return
 
     for label, filename in csv_types.items():
@@ -209,12 +209,12 @@ def _merge_incremental_csvs(
             continue
 
         # Read backup (full dataset) rows
-        old_rows: List[Dict[str, str]] = []
+        old_rows: list[dict[str, str]] = []
         with backup_path.open("r", encoding="utf-8-sig", newline="") as fh:
             old_rows = list(csv.DictReader(fh))
 
         # Read incremental (new) rows
-        new_rows: List[Dict[str, str]] = []
+        new_rows: list[dict[str, str]] = []
         with current_path.open("r", encoding="utf-8-sig", newline="") as fh:
             reader = csv.DictReader(fh)
             fieldnames = reader.fieldnames or []
@@ -343,15 +343,15 @@ def _main_impl() -> int:
     else:
         print("  Full refresh (no previous run or --force-full)", flush=True)
 
-    errors: List[str] = []
-    warnings: List[str] = []
-    sources_run: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
+    sources_run: list[str] = []
 
     # Step 1: Fetch CT.gov
     if "ctgov" in sources:
         is_incremental = bool(last_date and not args.force_full)
         # Back up existing CSVs before incremental fetch (to merge later)
-        ctgov_backups: Dict[str, Path] = {}
+        ctgov_backups: dict[str, Path] = {}
         if is_incremental and not args.dry_run:
             query_name = "icu_rct_broad"
             for label, suffix in [("studies", "_studies.csv"), ("hemo", "_hemodynamic_mentions.csv"),
@@ -483,7 +483,7 @@ def _main_impl() -> int:
     # 0=success, 1=failure, 2=partial failure (some sources failed but build succeeded)
     if status == "failure":
         return 1
-    elif status == "partial_failure":
+    if status == "partial_failure":
         return 2
     return 0
 

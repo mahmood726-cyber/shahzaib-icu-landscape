@@ -6,8 +6,7 @@ to enriched publications.
 """
 from __future__ import annotations
 
-import sqlite3
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import quote
 
 from sources.base_adapter import BaseAdapter, FetchResult
@@ -15,12 +14,12 @@ from sources.base_adapter import BaseAdapter, FetchResult
 
 class OpenCitationsAdapter(BaseAdapter):
 
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         dois = self._get_trial_dois(nct_id)
         if not dois:
             return FetchResult(nct_id, self.source_name, "empty", records=0)
 
-        all_edges: List[Dict[str, Any]] = []
+        all_edges: list[dict[str, Any]] = []
         for doi in dois:
             incoming = self._get_citations(doi)
             outgoing = self._get_references(doi)
@@ -32,7 +31,7 @@ class OpenCitationsAdapter(BaseAdapter):
             return FetchResult(nct_id, self.source_name, "empty", records=0)
         return FetchResult(nct_id, self.source_name, "ok", records=len(all_edges))
 
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         edges = context.get("_opencit_edges", [])
         if not edges:
             return
@@ -57,7 +56,7 @@ class OpenCitationsAdapter(BaseAdapter):
         finally:
             conn.close()
 
-    def _get_trial_dois(self, nct_id: str) -> List[str]:
+    def _get_trial_dois(self, nct_id: str) -> list[str]:
         conn = self._get_conn()
         try:
             rows = conn.execute(
@@ -68,7 +67,7 @@ class OpenCitationsAdapter(BaseAdapter):
             conn.close()
         return [row[0] for row in rows]
 
-    def _get_citations(self, doi: str) -> List[Dict[str, str]]:
+    def _get_citations(self, doi: str) -> list[dict[str, str]]:
         """Get incoming citations (papers that cite this DOI)."""
         safe_doi = quote(doi, safe="")
         url = f"{self.config.base_url}/citations/{safe_doi}"
@@ -77,7 +76,7 @@ class OpenCitationsAdapter(BaseAdapter):
         except Exception:
             return []
 
-        edges: List[Dict[str, str]] = []
+        edges: list[dict[str, str]] = []
         if isinstance(data, list):
             for item in data:
                 citing = item.get("citing", "")
@@ -90,7 +89,7 @@ class OpenCitationsAdapter(BaseAdapter):
                     })
         return edges
 
-    def _get_references(self, doi: str) -> List[Dict[str, str]]:
+    def _get_references(self, doi: str) -> list[dict[str, str]]:
         """Get outgoing references (papers this DOI cites)."""
         safe_doi = quote(doi, safe="")
         url = f"{self.config.base_url}/references/{safe_doi}"
@@ -99,7 +98,7 @@ class OpenCitationsAdapter(BaseAdapter):
         except Exception:
             return []
 
-        edges: List[Dict[str, str]] = []
+        edges: list[dict[str, str]] = []
         if isinstance(data, list):
             for item in data:
                 citing = item.get("citing", "")

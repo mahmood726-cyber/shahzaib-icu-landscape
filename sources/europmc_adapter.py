@@ -6,8 +6,7 @@ text-mined annotations (drugs, diseases, organisms).
 """
 from __future__ import annotations
 
-import sqlite3
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import quote_plus
 
 from sources.base_adapter import BaseAdapter, FetchResult
@@ -26,13 +25,13 @@ def _name_from_uri(uri: str) -> str:
 
 class EuropePMCAdapter(BaseAdapter):
 
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         pubs = self._search_nct(nct_id)
         if not pubs:
             return FetchResult(nct_id, self.source_name, "empty", records=0)
 
         # Fetch annotations for each PMC article
-        all_annotations: List[Dict[str, Any]] = []
+        all_annotations: list[dict[str, Any]] = []
         for pub in pubs:
             pmcid = pub.get("pmcid")
             # Validate PMCID format before making API call (P-19)
@@ -45,7 +44,7 @@ class EuropePMCAdapter(BaseAdapter):
         # Report publication count only (annotations are supplementary)
         return FetchResult(nct_id, self.source_name, "ok", records=len(pubs))
 
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         pubs = context.get("_europmc_pubs", [])
         annotations = context.get("_europmc_annotations", [])
         now = self._now_utc()
@@ -100,7 +99,7 @@ class EuropePMCAdapter(BaseAdapter):
         raw_data = json.dumps(pubs, sort_keys=True).encode("utf-8")
         self.store_hash(f"europmc:{result.nct_id}", self._hash_bytes(raw_data))
 
-    def _search_nct(self, nct_id: str) -> List[Dict[str, Any]]:
+    def _search_nct(self, nct_id: str) -> list[dict[str, Any]]:
         """Search Europe PMC for publications referencing this NCT ID."""
         safe_nct = quote_plus(nct_id)
         url = (
@@ -110,7 +109,7 @@ class EuropePMCAdapter(BaseAdapter):
         data = self._get_json(url)
         results = data.get("resultList", {}).get("result", [])
 
-        pubs: List[Dict[str, Any]] = []
+        pubs: list[dict[str, Any]] = []
         for item in results:
             pubs.append({
                 "pmid": item.get("pmid"),
@@ -123,7 +122,7 @@ class EuropePMCAdapter(BaseAdapter):
             })
         return pubs
 
-    def _get_annotations(self, pmcid: str) -> List[Dict[str, Any]]:
+    def _get_annotations(self, pmcid: str) -> list[dict[str, Any]]:
         """Fetch text-mined annotations for a PMC article."""
         url = f"{self.config.base_url}/{pmcid}/annotations?format=JSON"
         try:
@@ -133,7 +132,7 @@ class EuropePMCAdapter(BaseAdapter):
             print(f"    [europmc] annotations failed for {pmcid}: {exc}", file=sys.stderr)
             return []
 
-        annotations: List[Dict[str, Any]] = []
+        annotations: list[dict[str, Any]] = []
         if not isinstance(data, list):
             return annotations
 

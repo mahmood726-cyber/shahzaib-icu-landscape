@@ -1,4 +1,3 @@
-import re
 
 # Test: HR negative context gap for HR >= 1.0 with = sign
 # "HR=1.5" is NOT caught because the [=:] pattern only checks 0.\d

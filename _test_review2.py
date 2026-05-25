@@ -112,7 +112,8 @@ print(f"'map' in parts: {any(p == 'map' for p in parts3)}")
 # Regex \d{8}T\d{6}\d*Z -> matches "20260207T214337000000Z". Good.
 
 print("\n=== Capsule filename regex vs generated timestamps ===")
-from datetime import datetime, timezone
+from datetime import datetime
+
 test_ts = "2026-02-07T21:43:37.598858+00:00"
 now = datetime.fromisoformat(test_ts)
 timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")

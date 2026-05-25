@@ -10,16 +10,15 @@ from pathlib import Path
 from typing import Any, Dict
 
 from sources.base_adapter import AdapterConfig, BaseAdapter
-from sources.pubmed_adapter import PubMedAdapter
+from sources.crossref_adapter import CrossrefAdapter
 from sources.europmc_adapter import EuropePMCAdapter
 from sources.openalex_adapter import OpenAlexAdapter
-from sources.crossref_adapter import CrossrefAdapter
 from sources.opencitations_adapter import OpenCitationsAdapter
+from sources.openfda_adapter import OpenFDAAdapter
+from sources.pubmed_adapter import PubMedAdapter
 from sources.unpaywall_adapter import UnpaywallAdapter
 
-from sources.openfda_adapter import OpenFDAAdapter
-
-ADAPTERS: Dict[str, type] = {
+ADAPTERS: dict[str, type] = {
     "pubmed": PubMedAdapter,
     "europmc": EuropePMCAdapter,
     "openalex": OpenAlexAdapter,
@@ -33,7 +32,7 @@ ADAPTERS: Dict[str, type] = {
 # Dependency chain: sources that produce DOIs must run before sources
 # that consume DOIs.  "phase_1" sources run first (NCT→PMIDs/DOIs),
 # then "phase_2" sources use those DOIs.
-SOURCE_PHASES: Dict[str, int] = {
+SOURCE_PHASES: dict[str, int] = {
     "pubmed": 1,
     "europmc": 1,
 
@@ -45,7 +44,7 @@ SOURCE_PHASES: Dict[str, int] = {
 }
 
 
-DEFAULT_BASE_URLS: Dict[str, str] = {
+DEFAULT_BASE_URLS: dict[str, str] = {
     "pubmed": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
     "europmc": "https://www.ebi.ac.uk/europepmc/webservices/rest",
     "openalex": "https://api.openalex.org",
@@ -60,8 +59,8 @@ DEFAULT_BASE_URLS: Dict[str, str] = {
 def get_adapter(
     name: str,
     db_path: Path,
-    config: Dict[str, Any],
-    global_config: Dict[str, Any],
+    config: dict[str, Any],
+    global_config: dict[str, Any],
 ) -> BaseAdapter:
     """Create an adapter instance from config dict."""
     cls = ADAPTERS.get(name)

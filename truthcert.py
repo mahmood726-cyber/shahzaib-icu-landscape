@@ -21,13 +21,11 @@ import platform
 import re
 import socket
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from validators import ValidationResult, run_validators
-
 
 # ── Hashing ───────────────────────────────────────────────────────────
 
@@ -49,8 +47,8 @@ ONTOLOGY_SEMANTIC_VERSION = "v2.0 — added fluid responsiveness, echo params, r
 
 
 def compute_ontology_version(
-    canonical_rules: List[Tuple[str, List[str]]],
-    unit_patterns: List[Tuple[str, str]],
+    canonical_rules: list[tuple[str, list[str]]],
+    unit_patterns: list[tuple[str, str]],
 ) -> str:
     """Deterministic SHA-256 of the ontology rules (sorted JSON)."""
     payload = json.dumps(
@@ -89,7 +87,7 @@ def get_machine_id() -> str:
 
 # ── Drift Detection ──────────────────────────────────────────────────
 
-def _pct_change(old: int, new: int, has_prev_capsule: bool = False) -> Optional[float]:
+def _pct_change(old: int, new: int, has_prev_capsule: bool = False) -> float | None:
     """Percentage change. Returns None only for true first-run bootstrap (no prev capsule).
 
     When a previous capsule exists, 0→N is flagged as major drift (likely
@@ -114,12 +112,12 @@ def _drift_severity(pct: float) -> str:
 
 def detect_drift(
     label: str,
-    current_totals: Dict[str, int],
+    current_totals: dict[str, int],
     ontology_version: str,
-    prev_capsule: Optional[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    prev_capsule: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
     """Compare current run to previous capsule and return drift events."""
-    events: List[Dict[str, Any]] = []
+    events: list[dict[str, Any]] = []
     if prev_capsule is None:
         return events
 
@@ -201,17 +199,17 @@ def detect_drift(
 # ── Badge Calculation ─────────────────────────────────────────────────
 
 def calculate_badge(
-    validations: List[ValidationResult],
-    drift_events: List[Dict[str, Any]],
-    prev_capsules: List[Dict[str, Any]],
-) -> Tuple[str, List[str]]:
+    validations: list[ValidationResult],
+    drift_events: list[dict[str, Any]],
+    prev_capsules: list[dict[str, Any]],
+) -> tuple[str, list[str]]:
     """
     Determine assurance badge:
       Bronze: Any P0 failure OR any P1 warning
       Silver: All P0 pass + all P1 pass
       Gold:   Silver + last 2 previous capsules were silver/gold + no major drift
     """
-    reasons: List[str] = []
+    reasons: list[str] = []
 
     p0_fails = [v for v in validations if v.severity == "P0" and not v.passed]
     p1_fails = [v for v in validations if v.severity == "P1" and not v.passed]
@@ -252,10 +250,10 @@ def calculate_badge(
 # ── Abstentions ───────────────────────────────────────────────────────
 
 def collect_abstentions(
-    summary: Dict[str, Any],
-    canonical_names: List[str],
-    canonical_rules: Optional[List[Any]] = None,
-) -> List[Dict[str, Any]]:
+    summary: dict[str, Any],
+    canonical_names: list[str],
+    canonical_rules: list[Any] | None = None,
+) -> list[dict[str, Any]]:
     """Identify normalized keywords that mapped to 'Unmapped' — these are abstentions.
 
     A raw keyword is NOT an abstention if it appears as a token in any
@@ -264,7 +262,7 @@ def collect_abstentions(
     false-positive abstentions for tokens like "blood pressure" vs
     canonical name "Blood Pressure".
     """
-    abstentions: List[Dict[str, Any]] = []
+    abstentions: list[dict[str, Any]] = []
     for item in summary.get("normalized_keywords", []):
         kw = item.get("keyword", "")
         if kw.lower() == "unmapped":
@@ -318,13 +316,13 @@ _CAPSULE_FN_RE = re.compile(r"^capsule_[a-zA-Z0-9_-]+_\d{8}T\d{6}\d*Z\.json$")
 
 def _load_prev_capsules(
     capsule_dir: Path, label: str, limit: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Load previous capsule JSONs from capsule_dir, sorted by generated_utc.
 
     Only the most recent `limit` capsules are returned (default 5).
     Capsules missing required keys or with non-conforming filenames are skipped.
     """
-    capsules: List[Dict[str, Any]] = []
+    capsules: list[dict[str, Any]] = []
     if not capsule_dir.exists():
         return capsules
     pattern = f"capsule_{label}_*.json"
@@ -346,7 +344,7 @@ def _load_prev_capsules(
     return capsules[-limit:] if limit else capsules
 
 
-def _load_latest_capsule(capsule_dir: Path, label: str) -> Optional[Dict[str, Any]]:
+def _load_latest_capsule(capsule_dir: Path, label: str) -> dict[str, Any] | None:
     """Load the most recent capsule for this label."""
     capsules = _load_prev_capsules(capsule_dir, label)
     return capsules[-1] if capsules else None
@@ -359,9 +357,9 @@ def _append_drift_ledger(
     capsule_id: str,
     generated_utc: str,
     label: str,
-    drift_events: List[Dict[str, Any]],
+    drift_events: list[dict[str, Any]],
     badge: str,
-    totals: Dict[str, int],
+    totals: dict[str, int],
 ) -> None:
     """Append a single JSONL line to the drift ledger."""
     entry = {
@@ -386,17 +384,17 @@ def build_capsule(
     studies_csv: Path,
     hemo_csv: Path,
     output_csv: Path,
-    summary: Dict[str, Any],
-    canonical_rules: List[Any],
-    unit_patterns: List[Any],
+    summary: dict[str, Any],
+    canonical_rules: list[Any],
+    unit_patterns: list[Any],
     output_dir: Path,
-    dashboard_dir: Optional[Path] = None,
-    raw_jsonl: Optional[Path] = None,
-    enrich_db: Optional[Path] = None,
-    run_timestamp: Optional[str] = None,
-    search_strategy: Optional[Dict[str, Any]] = None,
-    extra_input_files: Optional[List[Path]] = None,
-) -> Dict[str, Any]:
+    dashboard_dir: Path | None = None,
+    raw_jsonl: Path | None = None,
+    enrich_db: Path | None = None,
+    run_timestamp: str | None = None,
+    search_strategy: dict[str, Any] | None = None,
+    extra_input_files: list[Path] | None = None,
+) -> dict[str, Any]:
     """
     Build a TruthCert capsule:
       1. Hash inputs and outputs
@@ -443,7 +441,7 @@ def build_capsule(
     capsule_id = f"TC-{label}-{timestamp}"
 
     # 1. Hash inputs/outputs
-    input_hashes: Dict[str, str] = {}
+    input_hashes: dict[str, str] = {}
     for path in [studies_csv, hemo_csv]:
         if path.exists():
             input_hashes[path.name] = compute_file_hash(path)
@@ -461,7 +459,7 @@ def build_capsule(
             import sys
             print(f"  [truthcert] Cannot hash enrichment DB (locked?): {exc}", file=sys.stderr)
 
-    output_hashes: Dict[str, str] = {}
+    output_hashes: dict[str, str] = {}
     if output_csv.exists():
         output_hashes[output_csv.name] = compute_file_hash(output_csv)
     suffix = "" if label == "broad" else f"_{label}"

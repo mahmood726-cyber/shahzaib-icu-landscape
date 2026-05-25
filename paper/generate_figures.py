@@ -11,12 +11,11 @@ Usage:
 
 import json
 import os
-import sys
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 
 # ── Paths ──────────────────────────────────────────────────────────────

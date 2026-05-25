@@ -10,9 +10,8 @@ Rate limit: 3 req/sec without API key.
 from __future__ import annotations
 
 import re
-import sqlite3
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import quote_plus
 
 from sources.base_adapter import BaseAdapter, FetchResult
@@ -20,7 +19,7 @@ from sources.base_adapter import BaseAdapter, FetchResult
 
 class PubMedAdapter(BaseAdapter):
 
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         """Search PubMed for PMIDs linked to this NCT ID, then fetch metadata."""
         pmids = self._esearch(nct_id)
         if not pmids:
@@ -31,7 +30,7 @@ class PubMedAdapter(BaseAdapter):
         context["_pubmed_pmids"] = pmids
         return FetchResult(nct_id, self.source_name, "ok", records=len(articles))
 
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         articles = context.get("_pubmed_articles", [])
         if not articles:
             return
@@ -88,7 +87,7 @@ class PubMedAdapter(BaseAdapter):
         raw_data = json.dumps(articles, sort_keys=True).encode("utf-8")
         self.store_hash(f"pubmed:{result.nct_id}", self._hash_bytes(raw_data))
 
-    def _esearch(self, nct_id: str) -> List[str]:
+    def _esearch(self, nct_id: str) -> list[str]:
         """Search PubMed for PMIDs associated with an NCT ID."""
         safe_nct = quote_plus(f'"{nct_id}"[si]')
         url = (
@@ -100,13 +99,13 @@ class PubMedAdapter(BaseAdapter):
         pmids = result.get("idlist", [])
         return pmids
 
-    def _efetch(self, pmids: List[str]) -> List[Dict[str, Any]]:
+    def _efetch(self, pmids: list[str]) -> list[dict[str, Any]]:
         """Fetch article metadata for a list of PMIDs (batch up to 200)."""
         # Validate PMIDs are purely numeric to prevent URL parameter injection
         safe_pmids = [p for p in pmids if p and re.match(r"^\d{1,12}$", p)]
         if not safe_pmids:
             return []
-        articles: List[Dict[str, Any]] = []
+        articles: list[dict[str, Any]] = []
         # Batch in groups of 200
         for i in range(0, len(safe_pmids), 200):
             batch = safe_pmids[i : i + 200]
@@ -119,9 +118,9 @@ class PubMedAdapter(BaseAdapter):
             articles.extend(self._parse_pubmed_xml(raw))
         return articles
 
-    def _parse_pubmed_xml(self, xml_bytes: bytes) -> List[Dict[str, Any]]:
+    def _parse_pubmed_xml(self, xml_bytes: bytes) -> list[dict[str, Any]]:
         """Parse PubMed XML efetch response into article dicts."""
-        articles: List[Dict[str, Any]] = []
+        articles: list[dict[str, Any]] = []
         # Reject XML with inline ENTITY declarations to prevent entity
         # expansion attacks (billion-laughs). Note: PubMed responses
         # legitimately include <!DOCTYPE> so we only block <!ENTITY>.
@@ -136,7 +135,7 @@ class PubMedAdapter(BaseAdapter):
             return articles
 
         for article_el in root.findall(".//PubmedArticle"):
-            art: Dict[str, Any] = {}
+            art: dict[str, Any] = {}
 
             # PMID (validate format — V-1)
             pmid_el = article_el.find(".//PMID")
@@ -180,7 +179,7 @@ class PubMedAdapter(BaseAdapter):
             art["pmcid"] = pmcid
 
             # MeSH terms
-            mesh_terms: List[Dict[str, Any]] = []
+            mesh_terms: list[dict[str, Any]] = []
             for mesh_heading in article_el.findall(".//MeshHeading"):
                 desc = mesh_heading.find("DescriptorName")
                 if desc is None:

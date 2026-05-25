@@ -15,7 +15,7 @@ import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 
 @dataclass
@@ -25,7 +25,7 @@ class ValidationResult:
     passed: bool
     message: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -66,7 +66,7 @@ SUMMARY_TOTAL_FIELDS = [
 _NCT_RE = re.compile(r"^NCT\d{8}$")
 
 
-def _read_csv_header(path: Path) -> Optional[List[str]]:
+def _read_csv_header(path: Path) -> list[str] | None:
     """Return the header row of a CSV file, or None if file is missing/empty."""
     if not path.exists():
         return None
@@ -78,9 +78,9 @@ def _read_csv_header(path: Path) -> Optional[List[str]]:
             return None
 
 
-def _read_csv_column(path: Path, column: str, max_rows: int = 500) -> List[str]:
+def _read_csv_column(path: Path, column: str, max_rows: int = 500) -> list[str]:
     """Read up to max_rows values from a single CSV column."""
-    values: List[str] = []
+    values: list[str] = []
     if not path.exists():
         return values
     with path.open("r", encoding="utf-8-sig", newline="") as fh:
@@ -138,10 +138,10 @@ def validate_schema_output(output_csv: Path) -> ValidationResult:
                             f"Output CSV has all {len(OUTPUT_COLUMNS)} expected columns")
 
 
-def validate_summary_totals(summary: Dict[str, Any]) -> ValidationResult:
+def validate_summary_totals(summary: dict[str, Any]) -> ValidationResult:
     """P0-summary-totals: All expected total fields present and non-negative integers."""
     totals = summary.get("totals", {})
-    problems: List[str] = []
+    problems: list[str] = []
     for field in SUMMARY_TOTAL_FIELDS:
         val = totals.get(field)
         if val is None:
@@ -202,7 +202,7 @@ def validate_nct_format(output_csv: Path) -> ValidationResult:
     return ValidationResult("P0-nct-format", "P0", True, msg)
 
 
-def validate_total_consistency(summary: Dict[str, Any]) -> ValidationResult:
+def validate_total_consistency(summary: dict[str, Any]) -> ValidationResult:
     """P0-total-consistency: total_hemo == placebo + non_placebo == core + adjunct."""
     totals = summary.get("totals", {})
     total = totals.get("total_hemo_mentions", 0)
@@ -223,7 +223,7 @@ def validate_total_consistency(summary: Dict[str, Any]) -> ValidationResult:
                             f"Mention totals consistent: {total} = {placebo}+{non_placebo} = {core}+{adjunct}")
 
 
-def validate_referential_integrity(summary: Dict[str, Any]) -> ValidationResult:
+def validate_referential_integrity(summary: dict[str, Any]) -> ValidationResult:
     """P1-referential-integrity: No orphan hemo NCT IDs missing from studies CSV."""
     totals = summary.get("totals", {})
     orphans = totals.get("orphan_hemo_nct_ids", 0)
@@ -237,7 +237,7 @@ def validate_referential_integrity(summary: Dict[str, Any]) -> ValidationResult:
 
 # ── P1 validators (Warn) ─────────────────────────────────────────────
 
-def validate_keyword_coverage(summary: Dict[str, Any], config_keywords: List[str]) -> ValidationResult:
+def validate_keyword_coverage(summary: dict[str, Any], config_keywords: list[str]) -> ValidationResult:
     """P1-keyword-coverage: >=80% of config keywords appear in normalized_keywords."""
     found = {item["keyword"] for item in summary.get("normalized_keywords", [])}
     if not config_keywords:
@@ -251,7 +251,7 @@ def validate_keyword_coverage(summary: Dict[str, Any], config_keywords: List[str
         f"{present}/{len(config_keywords)} config keywords found ({ratio:.0%}); threshold 80%")
 
 
-def validate_normalization_coverage(summary: Dict[str, Any]) -> ValidationResult:
+def validate_normalization_coverage(summary: dict[str, Any]) -> ValidationResult:
     """P1-normalization-coverage: <=5% of normalized keywords are 'Unmapped'."""
     keywords = summary.get("normalized_keywords", [])
     total_mentions = sum(item.get("mention_count", 0) for item in keywords)
@@ -269,7 +269,7 @@ def validate_normalization_coverage(summary: Dict[str, Any]) -> ValidationResult
         f"{unmapped_mentions}/{total_mentions} mentions unmapped ({ratio:.1%}); threshold 5%")
 
 
-def validate_unit_coverage(summary: Dict[str, Any]) -> ValidationResult:
+def validate_unit_coverage(summary: dict[str, Any]) -> ValidationResult:
     """P1-unit-coverage: <=40% of mentions have empty/Unspecified units."""
     units = summary.get("units", [])
     total_mentions = sum(item.get("mention_count", 0) for item in units)
@@ -287,7 +287,7 @@ def validate_unit_coverage(summary: Dict[str, Any]) -> ValidationResult:
         f"{unspecified}/{total_mentions} mentions unspecified ({ratio:.1%}); threshold 40%")
 
 
-def validate_empty_summary_sections(summary: Dict[str, Any]) -> ValidationResult:
+def validate_empty_summary_sections(summary: dict[str, Any]) -> ValidationResult:
     """P1-empty-summary-sections: All 5 list sections (keywords, normalized_keywords,
     units, outcome_types, conditions) are non-empty."""
     sections = ["keywords", "normalized_keywords", "units", "outcome_types", "conditions"]
@@ -301,7 +301,7 @@ def validate_empty_summary_sections(summary: Dict[str, Any]) -> ValidationResult
 
 # ── P2 validators (Info) ─────────────────────────────────────────────
 
-def validate_ontology_version_logged(ontology_version: Optional[str]) -> ValidationResult:
+def validate_ontology_version_logged(ontology_version: str | None) -> ValidationResult:
     """P2-ontology-version-logged: Ontology version string is present."""
     if ontology_version:
         return ValidationResult("P2-ontology-version-logged", "P2", True,
@@ -310,7 +310,7 @@ def validate_ontology_version_logged(ontology_version: Optional[str]) -> Validat
                             "Ontology version not computed")
 
 
-def validate_raw_input_hashed(input_hashes: Dict[str, str]) -> ValidationResult:
+def validate_raw_input_hashed(input_hashes: dict[str, str]) -> ValidationResult:
     """P2-raw-input-hashed: At least one raw input file hash is recorded."""
     if input_hashes:
         return ValidationResult("P2-raw-input-hashed", "P2", True,
@@ -319,7 +319,7 @@ def validate_raw_input_hashed(input_hashes: Dict[str, str]) -> ValidationResult:
                             "No input file hashes recorded")
 
 
-def validate_parquet_generated(summary: Dict[str, Any]) -> ValidationResult:
+def validate_parquet_generated(summary: dict[str, Any]) -> ValidationResult:
     """P2-parquet-generated: Parquet export succeeded."""
     parquet = summary.get("parquet", {})
     if parquet.get("status") == "ok":
@@ -331,7 +331,7 @@ def validate_parquet_generated(summary: Dict[str, Any]) -> ValidationResult:
 
 # ── Enrichment validators (only run when enrichment present) ────────
 
-def validate_enrichment_coverage(summary: Dict[str, Any]) -> ValidationResult:
+def validate_enrichment_coverage(summary: dict[str, Any]) -> ValidationResult:
     """P1-enrichment-coverage: >=30% of hemo-trial NCT IDs have linked publications."""
     enrichment = summary.get("enrichment", {})
     if not enrichment.get("enabled"):
@@ -350,7 +350,7 @@ def validate_enrichment_coverage(summary: Dict[str, Any]) -> ValidationResult:
         f"{enriched}/{total_hemo} trials enriched ({ratio:.0%}); threshold 30%")
 
 
-def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult:
+def validate_enrichment_staleness(enrich_db: Path | None) -> ValidationResult:
     """P1-enrichment-staleness: Oldest enrichment record < 60 days."""
     if enrich_db is None or not enrich_db.exists():
         return ValidationResult("P1-enrichment-staleness", "P1", True,
@@ -405,7 +405,7 @@ def validate_enrichment_staleness(enrich_db: Optional[Path]) -> ValidationResult
         f"Oldest enrichment record is {age_days:.0f} days old; threshold 60 days")
 
 
-def validate_enrichment_source_diversity(summary: Dict[str, Any]) -> ValidationResult:
+def validate_enrichment_source_diversity(summary: dict[str, Any]) -> ValidationResult:
     """P1-enrichment-source-diversity: >=3 of 7 sources contributed data."""
     enrichment = summary.get("enrichment", {})
     if not enrichment.get("enabled"):
@@ -419,7 +419,7 @@ def validate_enrichment_source_diversity(summary: Dict[str, Any]) -> ValidationR
         f"{active_sources} active sources; threshold 3")
 
 
-def validate_enrichment_db_exists(enrich_db: Optional[Path]) -> ValidationResult:
+def validate_enrichment_db_exists(enrich_db: Path | None) -> ValidationResult:
     """P2-enrichment-db-exists: SQLite file exists and is readable."""
     if enrich_db is None:
         return ValidationResult("P2-enrichment-db-exists", "P2", True,
@@ -432,7 +432,7 @@ def validate_enrichment_db_exists(enrich_db: Optional[Path]) -> ValidationResult
                             f"Enrichment DB not found: {enrich_db}")
 
 
-def validate_enrichment_hashes(enrich_db: Optional[Path]) -> ValidationResult:
+def validate_enrichment_hashes(enrich_db: Path | None) -> ValidationResult:
     """P2-enrichment-hashes: At least one source hash recorded in DB."""
     if enrich_db is None or not enrich_db.exists():
         return ValidationResult("P2-enrichment-hashes", "P2", True,
@@ -467,7 +467,7 @@ def _get_tooling_root() -> Path:
     )
 
 
-def validate_search_quality(summary: Dict[str, Any]) -> ValidationResult:
+def validate_search_quality(summary: dict[str, Any]) -> ValidationResult:
     """P2-search-quality: Run PRESS 2015 syntax check on the search query.
 
     Note: PRESS 2015 (McGowan et al.) was designed for bibliographic database
@@ -501,7 +501,7 @@ def validate_search_quality(summary: Dict[str, Any]) -> ValidationResult:
 
 
 def validate_recall_reference_standard(
-    summary: Dict[str, Any],
+    summary: dict[str, Any],
     studies_csv: Path,
 ) -> ValidationResult:
     """P2-recall-reference: Check recall against curated reference-standard NCT IDs.
@@ -532,7 +532,7 @@ def validate_recall_reference_standard(
 
 # ── Multi-source validators ──────────────────────────────────────────
 
-def validate_multi_source_coverage(summary: Dict[str, Any]) -> ValidationResult:
+def validate_multi_source_coverage(summary: dict[str, Any]) -> ValidationResult:
     """P1-multi-source-coverage: At least 2 of 2 primary sources contributed records."""
     flow = summary.get("prisma_flow", {})
     ctgov = flow.get("ctgov_retrieved", 0)
@@ -554,7 +554,7 @@ def validate_dedup_integrity(output_csv: Path) -> ValidationResult:
     if not output_csv.exists():
         return ValidationResult("P1-dedup-integrity", "P1", True,
                                 "Output CSV not found — skipped")
-    trial_sources: Dict[str, Set[str]] = {}
+    trial_sources: dict[str, set[str]] = {}
     with output_csv.open("r", encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         for i, row in enumerate(reader):
@@ -584,7 +584,7 @@ def validate_dedup_integrity(output_csv: Path) -> ValidationResult:
                             f"{len(trial_sources)} unique trials checked — dedup consistent")
 
 
-def validate_registry_diversity(summary: Dict[str, Any]) -> ValidationResult:
+def validate_registry_diversity(summary: dict[str, Any]) -> ValidationResult:
     """P2-registry-diversity: Report number of distinct registries represented."""
     registries = summary.get("registries", {})
     count = len(registries)
@@ -630,17 +630,17 @@ def run_validators(
     studies_csv: Path,
     hemo_csv: Path,
     output_csv: Path,
-    summary: Dict[str, Any],
-    ontology_version: Optional[str],
-    input_hashes: Dict[str, str],
-    config_keywords: Optional[List[str]] = None,
-    enrich_db: Optional[Path] = None,
-) -> List[ValidationResult]:
+    summary: dict[str, Any],
+    ontology_version: str | None,
+    input_hashes: dict[str, str],
+    config_keywords: list[str] | None = None,
+    enrich_db: Path | None = None,
+) -> list[ValidationResult]:
     """Run all validators and return the results."""
     if config_keywords is None:
         config_keywords = []
 
-    results: List[ValidationResult] = [
+    results: list[ValidationResult] = [
         # P0 — Block
         validate_schema_studies(studies_csv),
         validate_schema_hemo(hemo_csv),

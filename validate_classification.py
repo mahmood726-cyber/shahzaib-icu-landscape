@@ -21,7 +21,6 @@ import random
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "output"
@@ -31,7 +30,7 @@ VALIDATION_DIR = ROOT / "validation"
 MENTION_COLS = ["nct_id", "outcome_type", "measure", "keyword", "matched_text", "query_name"]
 
 
-def load_mentions(path: Path) -> List[Dict[str, str]]:
+def load_mentions(path: Path) -> list[dict[str, str]]:
     """Load hemodynamic mentions CSV."""
     rows = []
     with path.open("r", encoding="utf-8") as fh:
@@ -41,7 +40,7 @@ def load_mentions(path: Path) -> List[Dict[str, str]]:
     return rows
 
 
-def stratified_sample(mentions: List[Dict[str, str]], n: int, seed: int = 42) -> List[Dict[str, str]]:
+def stratified_sample(mentions: list[dict[str, str]], n: int, seed: int = 42) -> list[dict[str, str]]:
     """
     Stratified random sample ensuring representation from each keyword category.
 
@@ -53,7 +52,7 @@ def stratified_sample(mentions: List[Dict[str, str]], n: int, seed: int = 42) ->
     rng = random.Random(seed)
 
     # Group by keyword
-    by_keyword: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+    by_keyword: dict[str, list[dict[str, str]]] = defaultdict(list)
     for m in mentions:
         kw = m.get("keyword", "unknown")
         by_keyword[kw].append(m)
@@ -84,7 +83,7 @@ def stratified_sample(mentions: List[Dict[str, str]], n: int, seed: int = 42) ->
     return sample[:n]
 
 
-def write_sample(sample: List[Dict[str, str]], output_path: Path) -> None:
+def write_sample(sample: list[dict[str, str]], output_path: Path) -> None:
     """Write sample CSV with columns for manual annotation."""
     fieldnames = [
         "sample_id",
@@ -116,7 +115,7 @@ def write_sample(sample: List[Dict[str, str]], output_path: Path) -> None:
             })
 
 
-def evaluate(labeled_path: Path) -> Dict[str, any]:
+def evaluate(labeled_path: Path) -> dict[str, any]:
     """
     Compute classification metrics from a labeled validation sample.
 
@@ -139,7 +138,7 @@ def evaluate(labeled_path: Path) -> Dict[str, any]:
     incorrect = total - correct
 
     # Per-category metrics
-    by_cat: Dict[str, Dict[str, int]] = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0})
+    by_cat: dict[str, dict[str, int]] = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0})
 
     for r in rows:
         auto = r.get("keyword_automated", "").strip()
@@ -231,7 +230,7 @@ def main():
         # Show distribution
         kw_counts = Counter(m.get("keyword", "unknown") for m in mentions)
         print(f"  Unique keywords: {len(kw_counts)}")
-        print(f"  Top 10:")
+        print("  Top 10:")
         for kw, cnt in kw_counts.most_common(10):
             print(f"    {kw}: {cnt:,}")
 
@@ -240,12 +239,12 @@ def main():
         write_sample(sample, output_path)
         print(f"\nSample written to: {output_path}")
         print(f"  {len(sample)} mentions across {len(set(m['keyword'] for m in sample if 'keyword' in m))} categories")
-        print(f"\nInstructions:")
-        print(f"  1. Open the CSV in a spreadsheet editor")
-        print(f"  2. For each row, review 'measure' and 'matched_text'")
-        print(f"  3. Set 'is_correct' to TRUE if the automated keyword is appropriate")
-        print(f"  4. If FALSE, enter the correct keyword in 'correct_keyword'")
-        print(f"     - Use 'NOT_HEMODYNAMIC' if the mention is not hemodynamic at all")
+        print("\nInstructions:")
+        print("  1. Open the CSV in a spreadsheet editor")
+        print("  2. For each row, review 'measure' and 'matched_text'")
+        print("  3. Set 'is_correct' to TRUE if the automated keyword is appropriate")
+        print("  4. If FALSE, enter the correct keyword in 'correct_keyword'")
+        print("     - Use 'NOT_HEMODYNAMIC' if the mention is not hemodynamic at all")
         print(f"  5. Save and run: python validate_classification.py --evaluate {output_path}")
 
     elif args.evaluate:
@@ -259,7 +258,7 @@ def main():
 
         # Print summary
         print(f"\n{'='*60}")
-        print(f"CLASSIFICATION VALIDATION RESULTS")
+        print("CLASSIFICATION VALIDATION RESULTS")
         print(f"{'='*60}")
         print(f"Total samples:       {results['total_samples']}")
         print(f"Correct:             {results['correct']}")
@@ -269,7 +268,7 @@ def main():
         print(f"Overall sensitivity: {results['overall_sensitivity']}")
         print(f"False positive rate: {results['false_positive_rate']}")
 
-        print(f"\nPer-category metrics:")
+        print("\nPer-category metrics:")
         print(f"{'Category':<30} {'TP':>4} {'FP':>4} {'FN':>4} {'PPV':>7} {'Sens':>7}")
         print(f"{'-'*30} {'-'*4} {'-'*4} {'-'*4} {'-'*7} {'-'*7}")
         for cat, m in sorted(results["per_category"].items()):

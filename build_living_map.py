@@ -7,14 +7,14 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import shutil
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-import re
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any
 
 from truthcert import build_capsule
 
@@ -115,7 +115,7 @@ CANONICAL_RULES = [
     ("ICU Severity Score", ["apache ii", "apache", "saps ii", "saps", "qsofa", "sofa", "mods"]),
 ]
 
-UNIT_PATTERNS: List[Tuple[str, str]] = [
+UNIT_PATTERNS: list[tuple[str, str]] = [
     # mmHg/s MUST come before mmHg (longest match first — P0 unit ordering)
     (r"\bmm\s?hg\s*/\s*s\b", "mmHg/s"),
     (r"\bmm\s?hg\b", "mmHg"),
@@ -168,17 +168,17 @@ def _csv_safe(value: str) -> str:
 @dataclass
 class KeywordStats:
     mention_count: int = 0
-    study_ids: Set[str] = field(default_factory=set)
-    placebo_study_ids: Set[str] = field(default_factory=set)
+    study_ids: set[str] = field(default_factory=set)
+    placebo_study_ids: set[str] = field(default_factory=set)
 
 
-def read_csv(path: Path) -> List[Dict[str, str]]:
+def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         return [row for row in reader]
 
 
-def normalize_int(value: Optional[str]) -> int:
+def normalize_int(value: str | None) -> int:
     try:
         return int(value) if value is not None and value != "" else 0
     except ValueError:
@@ -187,7 +187,7 @@ def normalize_int(value: Optional[str]) -> int:
         return 0
 
 
-def split_list(value: str) -> List[str]:
+def split_list(value: str) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(";") if item.strip()]
@@ -293,7 +293,7 @@ def normalize_keyword(keyword: str, text: str) -> str:
 #   - the keyword category genuinely has no single unit ("varies", "N/A")
 # These are applied only when extract_unit() finds no explicit unit in
 # the measure/matched_text, so explicit units always take precedence.
-KEYWORD_FALLBACK_UNITS: Dict[str, str] = {
+KEYWORD_FALLBACK_UNITS: dict[str, str] = {
     "ICU Severity Score": "score",
     "Vasopressor-free days": "days",
     "Ventilation duration": "days",
@@ -324,7 +324,7 @@ _PERCENT_CONTEXT_RE = re.compile(
 )
 
 
-def extract_unit(text: str) -> Tuple[str, str]:
+def extract_unit(text: str) -> tuple[str, str]:
     if not text:
         return "", ""
     lower = text.lower()
@@ -341,7 +341,7 @@ def extract_unit(text: str) -> Tuple[str, str]:
     return "", ""
 
 
-def write_parquet(csv_path: Path, parquet_path: Path) -> Dict[str, str]:
+def write_parquet(csv_path: Path, parquet_path: Path) -> dict[str, str]:
     pyarrow_err = None
     try:
         import pyarrow.csv as pv  # type: ignore
@@ -371,14 +371,18 @@ def write_parquet(csv_path: Path, parquet_path: Path) -> Dict[str, str]:
 
 def _load_enrichment(
     enrich_db: Path,
-    nct_ids: Set[str],
-    config_path: Optional[Path] = None,
-) -> Dict[str, Dict[str, Any]]:
+    nct_ids: set[str],
+    config_path: Path | None = None,
+) -> dict[str, dict[str, Any]]:
     """Load enrichment data from SQLite using the orchestrator's query logic.
 
     Uses batch method (single DB connection) instead of per-NCT connections.
     """
-    from enrich_orchestrator import EnrichmentOrchestrator, load_config, DEFAULT_CONFIG_PATH
+    from enrich_orchestrator import (
+        DEFAULT_CONFIG_PATH,
+        EnrichmentOrchestrator,
+        load_config,
+    )
     effective_config_path = config_path or DEFAULT_CONFIG_PATH
     config = load_config(effective_config_path)
     orch = EnrichmentOrchestrator(enrich_db, config)
@@ -414,15 +418,15 @@ def _fuzzy_title_match(title_a: str, title_b: str, threshold: float = 0.85) -> b
     return similarity >= threshold
 
 
-def _title_words(s: str) -> Set[str]:
+def _title_words(s: str) -> set[str]:
     """Extract significant words (length >= 4) for fast Jaccard pre-filter."""
     return {w for w in re.split(r'\W+', s.lower()) if len(w) >= 4}
 
 
 def merge_multi_source(
-    ctgov_studies: List[Dict[str, str]],
-    pubmed_studies: Optional[List[Dict[str, str]]] = None,
-) -> Tuple[List[Dict[str, str]], Dict[str, str]]:
+    ctgov_studies: list[dict[str, str]],
+    pubmed_studies: list[dict[str, str]] | None = None,
+) -> tuple[list[dict[str, str]], dict[str, str]]:
     """Merge multi-source study records with deduplication.
 
     Priority order:
@@ -431,15 +435,15 @@ def merge_multi_source(
     3. Unique: records with no match are new non-CT.gov trials
     """
     # Index CT.gov studies by NCT ID and title
-    merged: Dict[str, Dict[str, str]] = {}
-    title_index: Dict[str, str] = {}  # lowercase title -> nct_id
+    merged: dict[str, dict[str, str]] = {}
+    title_index: dict[str, str] = {}  # lowercase title -> nct_id
     # Map non-CT trial IDs (e.g., PMID:xxxx) to matched NCT IDs
-    trial_id_map: Dict[str, str] = {}
+    trial_id_map: dict[str, str] = {}
 
     # Word-level inverted index for O(1) candidate filtering
     # Maps each significant word -> set of titles containing it
-    word_index: Dict[str, Set[str]] = defaultdict(set)
-    title_words_cache: Dict[str, Set[str]] = {}
+    word_index: dict[str, set[str]] = defaultdict(set)
+    title_words_cache: dict[str, set[str]] = {}
 
     for row in ctgov_studies:
         nct_id = row.get("nct_id", "").strip()
@@ -454,7 +458,7 @@ def merge_multi_source(
                 for w in words:
                     word_index[w].add(title)
 
-    def _find_fuzzy_match(ext_title: str) -> Optional[str]:
+    def _find_fuzzy_match(ext_title: str) -> str | None:
         """Find a fuzzy title match using word-Jaccard candidate filter."""
         # Exact match first
         if ext_title in title_index:
@@ -463,7 +467,7 @@ def merge_multi_source(
         if not ext_words:
             return None
         # Count how many words each existing title shares
-        candidate_counts: Dict[str, int] = defaultdict(int)
+        candidate_counts: dict[str, int] = defaultdict(int)
         for w in ext_words:
             for title in word_index.get(w, ()):
                 candidate_counts[title] += 1
@@ -478,7 +482,7 @@ def merge_multi_source(
                         return title_index[cand_title]
         return None
 
-    def _try_merge(ext_row: Dict[str, str], source_label: str) -> None:
+    def _try_merge(ext_row: dict[str, str], source_label: str) -> None:
         """Try to merge an external record into existing, or add as new."""
         ext_nct = ext_row.get("nct_id", "").strip()
         ext_trial_id = ext_row.get("trial_id", "").strip()
@@ -530,20 +534,20 @@ def merge_multi_source(
 
 
 def merge_multi_source_hemo(
-    ctgov_hemo: List[Dict[str, str]],
-    pubmed_hemo: Optional[List[Dict[str, str]]] = None,
-    trial_id_map: Optional[Dict[str, str]] = None,
-) -> List[Dict[str, str]]:
+    ctgov_hemo: list[dict[str, str]],
+    pubmed_hemo: list[dict[str, str]] | None = None,
+    trial_id_map: dict[str, str] | None = None,
+) -> list[dict[str, str]]:
     """Merge hemodynamic mention records from multiple sources.
 
     Dedup by (nct_id/trial_id, keyword, measure) tuple.
     """
-    seen: Set[Tuple[str, str, str]] = set()
-    result: List[Dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    result: list[dict[str, str]] = []
 
     id_map = trial_id_map or {}
 
-    def _add_rows(rows: List[Dict[str, str]]) -> None:
+    def _add_rows(rows: list[dict[str, str]]) -> None:
         for row in rows:
             nct_id = row.get("nct_id", "").strip() or row.get("trial_id", "").strip()
             mapped = id_map.get(nct_id)
@@ -569,14 +573,14 @@ def build_living_map(
     studies_csv: Path,
     hemo_csv: Path,
     output_dir: Path,
-    dashboard_dir: Optional[Path] = None,
+    dashboard_dir: Path | None = None,
     label: str = DEFAULT_LABEL,
     write_parquet_output: bool = True,
-    raw_jsonl: Optional[Path] = None,
-    enrich_db: Optional[Path] = None,
-    pubmed_studies_csv: Optional[Path] = None,
-    pubmed_hemo_csv: Optional[Path] = None,
-) -> Dict[str, object]:
+    raw_jsonl: Path | None = None,
+    enrich_db: Path | None = None,
+    pubmed_studies_csv: Path | None = None,
+    pubmed_hemo_csv: Path | None = None,
+) -> dict[str, object]:
     # Validate label to prevent path traversal and cross-label contamination
     if not re.match(r"^[a-zA-Z0-9_-]+$", label):
         raise ValueError(f"Invalid label '{label}': must be alphanumeric/hyphen/underscore only")
@@ -587,7 +591,7 @@ def build_living_map(
     pubmed_studies_rows = read_csv(pubmed_studies_csv) if pubmed_studies_csv and pubmed_studies_csv.exists() else None
     pubmed_hemo_rows = read_csv(pubmed_hemo_csv) if pubmed_hemo_csv and pubmed_hemo_csv.exists() else None
 
-    trial_id_map: Dict[str, str] = {}
+    trial_id_map: dict[str, str] = {}
     if pubmed_studies_rows:
         studies_rows, trial_id_map = merge_multi_source(studies_rows, pubmed_studies_rows)
         print(f"  Multi-source merge: {len(studies_rows)} studies after dedup", file=sys.stderr)
@@ -596,14 +600,14 @@ def build_living_map(
         hemo_rows = merge_multi_source_hemo(hemo_rows, pubmed_hemo_rows, trial_id_map)
         print(f"  Multi-source merge: {len(hemo_rows)} hemo mentions after dedup", file=sys.stderr)
 
-    studies_map: Dict[str, Dict[str, str]] = {}
+    studies_map: dict[str, dict[str, str]] = {}
     for row in studies_rows:
         nct_id = row.get("nct_id", "").strip()
         if nct_id:
             studies_map[nct_id] = row
 
     # Load enrichment data if available
-    enrichment_map: Dict[str, Dict[str, Any]] = {}
+    enrichment_map: dict[str, dict[str, Any]] = {}
     if enrich_db and enrich_db.exists():
         try:
             enrichment_map = _load_enrichment(enrich_db, set(studies_map.keys()))
@@ -657,19 +661,19 @@ def build_living_map(
     if enrichment_map:
         detailed_fields.extend(enrichment_fields)
 
-    keyword_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
-    normalized_keyword_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
-    unit_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
-    outcome_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
-    condition_stats: Dict[str, KeywordStats] = defaultdict(KeywordStats)
+    keyword_stats: dict[str, KeywordStats] = defaultdict(KeywordStats)
+    normalized_keyword_stats: dict[str, KeywordStats] = defaultdict(KeywordStats)
+    unit_stats: dict[str, KeywordStats] = defaultdict(KeywordStats)
+    outcome_stats: dict[str, KeywordStats] = defaultdict(KeywordStats)
+    condition_stats: dict[str, KeywordStats] = defaultdict(KeywordStats)
 
-    studies_with_hemo: Set[str] = set()
-    studies_with_hemo_and_placebo: Set[str] = set()
+    studies_with_hemo: set[str] = set()
+    studies_with_hemo_and_placebo: set[str] = set()
 
     total_mentions = 0
     placebo_mentions = 0
     adjunct_mentions = 0  # Non-hemodynamic adjuncts (severity scores, ventilation, metabolic)
-    orphan_nct_ids: Set[str] = set()  # hemo NCT IDs missing from studies CSV
+    orphan_nct_ids: set[str] = set()  # hemo NCT IDs missing from studies CSV
 
     detailed_tmp = detailed_path.with_suffix(".csv.tmp")
     with detailed_tmp.open("w", encoding="utf-8", newline="") as handle:
@@ -817,7 +821,7 @@ def build_living_map(
     )
 
     # Year distribution — extract year from start_date (format: "YYYY-MM-DD" or "YYYY-MM" or "YYYY")
-    year_counts: Dict[str, int] = defaultdict(int)
+    year_counts: dict[str, int] = defaultdict(int)
     for row in studies_rows:
         start_date = row.get("start_date", "").strip()
         if start_date and len(start_date) >= 4:
@@ -826,7 +830,7 @@ def build_living_map(
                 year_counts[year] += 1
 
     # Country aggregation from studies CSV
-    country_counts: Dict[str, int] = defaultdict(int)
+    country_counts: dict[str, int] = defaultdict(int)
     for row in studies_rows:
         countries_str = row.get("countries", "").strip()
         if countries_str:
@@ -836,7 +840,7 @@ def build_living_map(
                     country_counts[country] += 1
 
     # Registry distribution (from data_sources column)
-    registry_counts: Dict[str, int] = defaultdict(int)
+    registry_counts: dict[str, int] = defaultdict(int)
     for row in studies_rows:
         sources = row.get("data_sources", "ctgov").strip()
         for src in sources.split(";"):
@@ -846,14 +850,14 @@ def build_living_map(
 
     # Keyword co-occurrence — top 20 pairs of normalized keywords co-occurring in same study
     from itertools import combinations
-    study_keywords_map: Dict[str, Set[str]] = defaultdict(set)
+    study_keywords_map: dict[str, set[str]] = defaultdict(set)
     for row in hemo_rows:
         nct_id = row.get("nct_id", "").strip()
         if nct_id:
             kw = normalize_keyword(row.get("keyword", ""), row.get("matched_text", ""))
             study_keywords_map[nct_id].add(kw)
 
-    pair_counts: Dict[Tuple[str, str], int] = defaultdict(int)
+    pair_counts: dict[tuple[str, str], int] = defaultdict(int)
     for nct_id, kw_set in study_keywords_map.items():
         sorted_kws = sorted(kw_set)
         for kw_a, kw_b in combinations(sorted_kws, 2):
@@ -890,7 +894,7 @@ def build_living_map(
 
     # Build search_strategy metadata for TruthCert provenance
     config_path = ROOT / "ctgov_icu_placebo_strategy.json"
-    config_data: Dict[str, Any] = {}
+    config_data: dict[str, Any] = {}
     try:
         if config_path.exists():
             config_data = json.loads(config_path.read_text(encoding="utf-8"))
@@ -904,7 +908,7 @@ def build_living_map(
 
     # ref_nct_ids included here for capsule self-containedness (E-10) —
     # duplicates config, but capsule must be independently verifiable.
-    search_strategy: Dict[str, Any] = {
+    search_strategy: dict[str, Any] = {
         "query_text": fetch_query_text,
         "database": "ClinicalTrials.gov",
         "limitations": config_limitations,
@@ -913,7 +917,7 @@ def build_living_map(
     }
 
     # Status stratification (editor review #7)
-    status_counts: Dict[str, int] = defaultdict(int)
+    status_counts: dict[str, int] = defaultdict(int)
     for row in studies_rows:
         status = row.get("overall_status", "Unknown").strip() or "Unknown"
         status_counts[status] += 1
@@ -1037,7 +1041,7 @@ def build_living_map(
 
     # Add enrichment summary section
     if enrichment_map:
-        source_counts: Dict[str, int] = defaultdict(int)
+        source_counts: dict[str, int] = defaultdict(int)
         enriched_nct_ids = 0
         for nct_id, enr in enrichment_map.items():
             if enr.get("enrichment_sources"):
@@ -1056,7 +1060,7 @@ def build_living_map(
     # and gold-standard NCT IDs for P2 search quality checks.
     summary["search_strategy"] = search_strategy
 
-    parquet_info: Dict[str, str] = {"status": "skipped", "reason": "disabled"}
+    parquet_info: dict[str, str] = {"status": "skipped", "reason": "disabled"}
     if write_parquet_output:
         parquet_path = output_dir / f"icu_hemodynamic_living_map{suffix}.parquet"
         try:

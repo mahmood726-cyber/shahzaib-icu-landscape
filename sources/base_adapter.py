@@ -7,16 +7,16 @@ and the enrich() orchestration cycle: should_fetch → fetch → store → log.
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from urllib.request import Request, urlopen
+from typing import Any
 from urllib.error import HTTPError, URLError
-import json
+from urllib.request import Request, urlopen
 
 
 @dataclass
@@ -68,13 +68,13 @@ class BaseAdapter(ABC):
 
     # ── HTTP helpers ─────────────────────────────────────────────────
 
-    def _get(self, url: str, headers: Optional[Dict[str, str]] = None) -> bytes:
+    def _get(self, url: str, headers: dict[str, str] | None = None) -> bytes:
         """HTTP GET with rate limiting and retry."""
         hdrs = {"User-Agent": self._user_agent()}
         if headers:
             hdrs.update(headers)
 
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.config.retries):
             self._rate_limit()
             try:
@@ -101,7 +101,7 @@ class BaseAdapter(ABC):
 
         raise last_error or RuntimeError(f"GET {url} failed after {self.config.retries} retries")
 
-    def _get_json(self, url: str, headers: Optional[Dict[str, str]] = None) -> Any:
+    def _get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
         """HTTP GET returning parsed JSON. Raises ValueError on malformed response."""
         raw = self._get(url, headers)
         try:
@@ -184,7 +184,7 @@ class BaseAdapter(ABC):
 
     # ── Orchestration cycle ──────────────────────────────────────────
 
-    def enrich(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def enrich(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         """
         Main enrichment cycle for one trial:
           1. Check if fetch needed (incremental)
@@ -212,14 +212,14 @@ class BaseAdapter(ABC):
     # ── Abstract methods (must be implemented by each adapter) ───────
 
     @abstractmethod
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         """Fetch data from the source for a given NCT ID.
         Returns a FetchResult with status and record count.
         The raw data should be stored in context for store_results()."""
         ...
 
     @abstractmethod
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         """Persist fetched data into the enrichment SQLite database."""
         ...
 

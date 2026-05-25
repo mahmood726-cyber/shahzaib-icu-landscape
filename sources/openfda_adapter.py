@@ -8,12 +8,10 @@ and queries the FAERS adverse event database.
 from __future__ import annotations
 
 import re
-import sqlite3
-from typing import Any, Dict, List
+from typing import Any
 from urllib.parse import quote_plus
 
 from sources.base_adapter import BaseAdapter, FetchResult
-
 
 # Dosage/formulation patterns to strip from drug names
 _DOSAGE_RE = re.compile(
@@ -27,12 +25,12 @@ _DOSAGE_RE = re.compile(
 
 class OpenFDAAdapter(BaseAdapter):
 
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         drug_names = self._extract_drug_names(nct_id, context)
         if not drug_names:
             return FetchResult(nct_id, self.source_name, "empty", records=0)
 
-        all_signals: List[Dict[str, Any]] = []
+        all_signals: list[dict[str, Any]] = []
         for drug in drug_names:
             signals = self._search_faers(drug)
             for sig in signals:
@@ -44,7 +42,7 @@ class OpenFDAAdapter(BaseAdapter):
             return FetchResult(nct_id, self.source_name, "empty", records=0)
         return FetchResult(nct_id, self.source_name, "ok", records=len(all_signals))
 
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         signals = context.get("_openfda_signals", [])
         if not signals:
             return
@@ -72,7 +70,7 @@ class OpenFDAAdapter(BaseAdapter):
         finally:
             conn.close()
 
-    def _extract_drug_names(self, nct_id: str, context: Dict[str, Any]) -> List[str]:
+    def _extract_drug_names(self, nct_id: str, context: dict[str, Any]) -> list[str]:
         """Extract and normalize drug names from trial context or DB."""
         # Try context first (from studies CSV intervention_names)
         raw_names = context.get("intervention_names", "")
@@ -95,7 +93,7 @@ class OpenFDAAdapter(BaseAdapter):
 
         # Split on semicolons and pipes (not / — drug names like "IV/oral" are valid)
         parts = re.split(r"[;|]", raw_names)
-        normalized: List[str] = []
+        normalized: list[str] = []
         seen: set = set()
         for part in parts:
             name = _normalize_drug_name(part)
@@ -105,7 +103,7 @@ class OpenFDAAdapter(BaseAdapter):
 
         return normalized[:10]  # Cap at 10 drugs per trial
 
-    def _search_faers(self, drug_name: str) -> List[Dict[str, Any]]:
+    def _search_faers(self, drug_name: str) -> list[dict[str, Any]]:
         """Search openFDA FAERS for top adverse reactions for a drug."""
         safe_name = quote_plus(f'"{drug_name}"')
         url = (
@@ -120,7 +118,7 @@ class OpenFDAAdapter(BaseAdapter):
             return []
 
         results = data.get("results", [])
-        signals: List[Dict[str, Any]] = []
+        signals: list[dict[str, Any]] = []
         for item in results:
             signals.append({
                 "reaction": item.get("term", ""),

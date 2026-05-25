@@ -12,10 +12,10 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "ctgov_icu_placebo_strategy.json"
@@ -31,7 +31,12 @@ TOOLING_ROOT = Path(
 if str(TOOLING_ROOT) not in sys.path:
     sys.path.insert(0, str(TOOLING_ROOT))
 
-from ctgov_config import DEFAULT_PAGE_SIZE, DEFAULT_RATE_LIMIT, DEFAULT_TIMEOUT, DEFAULT_USER_AGENT  # type: ignore
+from ctgov_config import (  # type: ignore
+    DEFAULT_PAGE_SIZE,
+    DEFAULT_RATE_LIMIT,
+    DEFAULT_TIMEOUT,
+    DEFAULT_USER_AGENT,
+)
 from ctgov_utils import get_session, iter_study_pages  # type: ignore
 
 # TRUE placebo tokens — inert comparators only.
@@ -79,20 +84,20 @@ def classify_arm(text: str) -> str:
     return "experimental"
 
 
-def load_config(path: Path) -> Dict:
+def load_config(path: Path) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"Missing config: {path}")
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def normalize_text(value: Optional[str]) -> str:
+def normalize_text(value: str | None) -> str:
     if value is None or value == "":
         return ""
     return " ".join(str(value).split())
 
 
-def extract_list(values: Optional[Iterable[str]]) -> List[str]:
+def extract_list(values: Iterable[str] | None) -> list[str]:
     return [t for v in (values or []) if (t := normalize_text(v))]
 
 
@@ -173,7 +178,7 @@ def keyword_in_text(keyword: str, text: str) -> bool:
     return re.search(r"\b" + re.escape(k) + r"\b", t) is not None
 
 
-def find_hemodynamic_keywords(keywords: List[str], text: str) -> List[str]:
+def find_hemodynamic_keywords(keywords: list[str], text: str) -> list[str]:
     matches = []
     for kw in keywords:
         if keyword_in_text(kw, text):
@@ -189,7 +194,7 @@ _API_TYPE_MAP = {
 }
 
 
-def extract_arms(study: Dict) -> List[ArmRecord]:
+def extract_arms(study: dict) -> list[ArmRecord]:
     arms_module = study.get("protocolSection", {}).get("armsInterventionsModule", {})
     arms = []
     for arm in arms_module.get("armGroups", []) or []:
@@ -222,11 +227,11 @@ def extract_arms(study: Dict) -> List[ArmRecord]:
     return arms
 
 
-def extract_outcomes(study: Dict) -> List[OutcomeRecord]:
+def extract_outcomes(study: dict) -> list[OutcomeRecord]:
     outcomes_module = study.get("protocolSection", {}).get("outcomesModule", {})
-    outcome_records: List[OutcomeRecord] = []
+    outcome_records: list[OutcomeRecord] = []
 
-    def add_outcomes(items: Iterable[Dict], outcome_type: str) -> None:
+    def add_outcomes(items: Iterable[dict], outcome_type: str) -> None:
         for item in items or []:
             outcome_records.append(
                 OutcomeRecord(
@@ -244,7 +249,7 @@ def extract_outcomes(study: Dict) -> List[OutcomeRecord]:
     return outcome_records
 
 
-def extract_study_fields(study: Dict) -> Dict[str, str]:
+def extract_study_fields(study: dict) -> dict[str, str]:
     protocol = study.get("protocolSection", {})
     ident = protocol.get("identificationModule", {})
     status = protocol.get("statusModule", {})
@@ -263,7 +268,7 @@ def extract_study_fields(study: Dict) -> Dict[str, str]:
     # Extract countries from locations module
     locations_module = protocol.get("contactsLocationsModule", {})
     locations = locations_module.get("locations", []) or []
-    country_set: Set[str] = set()
+    country_set: set[str] = set()
     for loc in locations:
         country = normalize_text(loc.get("country"))
         if country:
@@ -324,7 +329,7 @@ def _csv_safe(value: str) -> str:
     return "'" + value if needs_prefix else value
 
 
-def open_csv(path: Path, header: List[str]) -> csv.DictWriter:
+def open_csv(path: Path, header: list[str]) -> csv.DictWriter:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(".csv.tmp")
     handle = tmp_path.open("w", encoding="utf-8", newline="")
@@ -357,13 +362,13 @@ def finalize_csv(writer: csv.DictWriter) -> None:
 def run_query(
     query_name: str,
     query_term: str,
-    keywords: List[str],
+    keywords: list[str],
     output_dir: Path,
     raw_dir: Path,
-    max_pages: Optional[int],
+    max_pages: int | None,
     page_size: int,
-    updated_since: Optional[str],
-) -> Dict[str, int]:
+    updated_since: str | None,
+) -> dict[str, int]:
     session = get_session(user_agent=DEFAULT_USER_AGENT)
     query_text_base = query_term  # Original query from config (before date filter)
     if updated_since:
@@ -453,7 +458,7 @@ def run_query(
     placebo_arm_rows = 0
     outcome_rows = 0
     hemo_rows = 0
-    unique_hemo_keywords: Set[str] = set()
+    unique_hemo_keywords: set[str] = set()
 
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -651,7 +656,7 @@ def main() -> int:
     log_dir.mkdir(parents=True, exist_ok=True)
     summary_path = log_dir / "ctgov_icu_fetch_summary.json"
 
-    summary: Dict[str, Dict[str, int]] = {}
+    summary: dict[str, dict[str, int]] = {}
     for query_name in queries:
         if query_name not in query_map:
             raise KeyError(f"Query not found in config: {query_name}")
@@ -670,7 +675,7 @@ def main() -> int:
         )
 
     # Merge into existing summary to avoid clobbering results from prior runs
-    existing: Dict[str, Dict[str, int]] = {}
+    existing: dict[str, dict[str, int]] = {}
     if summary_path.exists():
         try:
             existing = json.loads(summary_path.read_text(encoding="utf-8"))

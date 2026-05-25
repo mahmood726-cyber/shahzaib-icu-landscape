@@ -6,12 +6,11 @@ Disabled by default (requires email configuration).
 """
 from __future__ import annotations
 
-import sqlite3
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
-from sources.base_adapter import BaseAdapter, AdapterConfig, FetchResult
-from pathlib import Path
+from sources.base_adapter import AdapterConfig, BaseAdapter, FetchResult
 
 
 class UnpaywallAdapter(BaseAdapter):
@@ -22,7 +21,7 @@ class UnpaywallAdapter(BaseAdapter):
         if not config.email:
             self.config.enabled = False
 
-    def fetch_for_trial(self, nct_id: str, context: Dict[str, Any]) -> FetchResult:
+    def fetch_for_trial(self, nct_id: str, context: dict[str, Any]) -> FetchResult:
         if not self.config.email:
             return FetchResult(nct_id, self.source_name, "skipped",
                                error="no email configured")
@@ -31,7 +30,7 @@ class UnpaywallAdapter(BaseAdapter):
         if not dois:
             return FetchResult(nct_id, self.source_name, "empty", records=0)
 
-        oa_records: List[Dict[str, Any]] = []
+        oa_records: list[dict[str, Any]] = []
         for doi in dois:
             record = self._get_oa_status(doi)
             if record:
@@ -42,7 +41,7 @@ class UnpaywallAdapter(BaseAdapter):
             return FetchResult(nct_id, self.source_name, "empty", records=0)
         return FetchResult(nct_id, self.source_name, "ok", records=len(oa_records))
 
-    def store_results(self, result: FetchResult, context: Dict[str, Any]) -> None:
+    def store_results(self, result: FetchResult, context: dict[str, Any]) -> None:
         records = context.get("_unpaywall_records", [])
         if not records:
             return
@@ -70,7 +69,7 @@ class UnpaywallAdapter(BaseAdapter):
         finally:
             conn.close()
 
-    def _get_trial_dois(self, nct_id: str) -> List[str]:
+    def _get_trial_dois(self, nct_id: str) -> list[str]:
         conn = self._get_conn()
         try:
             rows = conn.execute(
@@ -81,7 +80,7 @@ class UnpaywallAdapter(BaseAdapter):
             conn.close()
         return [row[0] for row in rows]
 
-    def _get_oa_status(self, doi: str) -> Dict[str, Any] | None:
+    def _get_oa_status(self, doi: str) -> dict[str, Any] | None:
         """Fetch OA status for a single DOI."""
         safe_doi = quote(doi, safe="")
         email = quote(self.config.email, safe="@.")
