@@ -1,5 +1,7 @@
 # ICU Hemodynamic Trial Landscape
 
+[![ci](https://github.com/mahmood726-cyber/shahzaib-icu-landscape/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mahmood726-cyber/shahzaib-icu-landscape/actions/workflows/ci.yml) [![codeql](https://github.com/mahmood726-cyber/shahzaib-icu-landscape/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/mahmood726-cyber/shahzaib-icu-landscape/actions/workflows/codeql.yml) [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+
 A browser-based **living evidence map** for intensive-care hemodynamic research. Fetches RCTs from ClinicalTrials.gov, enriches via seven adapters (PubMed, OpenAlex, FAERS, and four others), and renders interactive dashboards with evidence-gap visualisations and PRISMA-style flow diagrams.
 
 **Live dashboard:** <https://mahmood726-cyber.github.io/shahzaib-icu-landscape/>
