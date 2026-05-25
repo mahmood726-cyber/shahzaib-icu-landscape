@@ -285,31 +285,31 @@
         <div class="filters">
           <label>
             Keyword
-            <input id="keywordFilter" type="text" placeholder="e.g., MAP, lactate" />
+            <input id="keywordFilter" type="text" placeholder="e.g., MAP, lactate" aria-label="Explorer" />
           </label>
           <label>
             Condition
-            <input id="conditionFilter" type="text" placeholder="e.g., sepsis, shock" />
+            <input id="conditionFilter" type="text" placeholder="e.g., sepsis, shock" aria-label="Explorer" />
           </label>
           <label>
             Outcome type
-            <select id="outcomeFilter">
+            <select id="outcomeFilter" aria-label="Outcome Filter">
               <option value="">All outcome types</option>
             </select>
           </label>
           <label>
             Unit
-            <select id="unitFilter">
+            <select id="unitFilter" aria-label="Unit Filter">
               <option value="">All units</option>
             </select>
           </label>
           <label class="checkbox">
-            <input id="placeboOnly" type="checkbox" />
+            <input id="placeboOnly" type="checkbox" aria-label="Placebo Only" />
             Placebo/sham only
           </label>
           <label>
             Sort by
-            <select id="sortBy">
+            <select id="sortBy" aria-label="Sort By">
               <option value="nct_id">NCT ID</option>
               <option value="measure">Measure</option>
               <option value="normalized_keyword">Normalized keyword</option>
@@ -320,14 +320,14 @@
           </label>
           <label>
             Direction
-            <select id="sortDir">
+            <select id="sortDir" aria-label="Sort Dir">
               <option value="asc">A &rarr; Z</option>
               <option value="desc">Z &rarr; A</option>
             </select>
           </label>
           <label>
             Rows
-            <select id="rowLimit">
+            <select id="rowLimit" aria-label="Row Limit">
               <option value="50">50</option>
               <option value="100" selected>100</option>
               <option value="250">250</option>
