@@ -3,7 +3,7 @@
 This manifest is the shortest reviewer-facing rerun path for the local software package. It lists the files that should be sufficient to recreate one worked example, inspect saved outputs, and verify that the manuscript claims remain bounded to what the repository actually demonstrates.
 
 ## Reviewer Entry Points
-- Project directory: `C:\Models\shahzaib-icu-landscape`.
+- Project directory: repository root (`shahzaib-icu-landscape`).
 - Preferred documentation start points: `README.md`, `f1000_artifacts/tutorial_walkthrough.md`.
 - Detected public repository root: `https://github.com/mahmood726-cyber/shahzaib-icu-landscape`.
 - Detected public source snapshot: Fixed public commit snapshot available at `https://github.com/mahmood726-cyber/shahzaib-icu-landscape/tree/d6f43a844a1c3e2b1971831d9c9eb786ed9ca689`.

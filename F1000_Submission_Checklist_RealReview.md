@@ -1,8 +1,8 @@
 # F1000 Submission Checklist (Real-Review Aligned)
 
 Updated: 2026-03-06
-Real review source: `C:\HTML apps\reviewer Report.txt`
-Package: `C:\Models\shahzaib-icu-landscape`
+Real review source: external reviewer-report note used to derive this checklist.
+Package: repository root (`shahzaib-icu-landscape`)
 
 ## Core gates derived from real peer-review concerns
 - [x] Full manuscript structure with non-skeleton Methods/Use cases/Discussion.

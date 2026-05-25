@@ -3,7 +3,7 @@
   "slug": "icu-hemodynamic-landscape",
   "author": "Mahmood Ahmad",
   "date": "2026-03-26",
-  "path": "C:\\Models\\shahzaib-icu-landscape",
+  "path": "..",
   "type": "methods",
   "primary_estimand": "Sensitivity",
   "summary": "A living evidence map for ICU hemodynamic trials achieves 100% sensitivity against a 21-trial reference standard.",

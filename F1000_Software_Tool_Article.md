@@ -38,9 +38,9 @@ The manuscript structure below is deliberately aligned to common open-software r
 The repository includes Python scripts for living-map generation and updates, dashboard assets, downloadable summary JSON, and a browser application that renders signal maps, evidence-gap views, co-occurrence plots, and PRISMA-style flow displays.
 
 ### Installation, runtime, and reviewer reruns
-The local implementation is packaged under `C:\Models\shahzaib-icu-landscape`. The manuscript identifies the local entry points, dependency manifest, fixed example input, and expected saved outputs so that reviewers can rerun the documented workflow without reconstructing it from scratch.
+The local implementation is packaged in this repository root. The manuscript identifies the local entry points, dependency manifest, fixed example input, and expected saved outputs so that reviewers can rerun the documented workflow without reconstructing it from scratch.
 
-- Entry directory: `C:\Models\shahzaib-icu-landscape`.
+- Entry directory: repository root (`shahzaib-icu-landscape`).
 - Detected documentation entry points: `README.md`, `f1000_artifacts/tutorial_walkthrough.md`.
 - Detected environment capture or packaging files: `requirements.txt`.
 - Named worked-example paths in this draft: `dashboard/index.html` for the main living map; `dashboard/insights.html` for the analytical companion view; `living_update.py`, `build_living_map.py`, and `living_log.jsonl` for reproducible update mechanics.
@@ -99,7 +99,7 @@ The software paper foregrounds that the platform maps trial registrations and st
 - The platform is descriptive and does not perform formal risk-of-bias or effect-size synthesis.
 
 ## Software Availability
-- Local source package: `shahzaib-icu-landscape` under `C:\Models`.
+- Local source package: repository root (`shahzaib-icu-landscape`).
 - Public repository: `https://github.com/mahmood726-cyber/shahzaib-icu-landscape`.
 - Public source snapshot: Fixed public commit snapshot available at `https://github.com/mahmood726-cyber/shahzaib-icu-landscape/tree/d6f43a844a1c3e2b1971831d9c9eb786ed9ca689`.
 - DOI/archive record: No project-specific DOI or Zenodo record URL was detected locally; archive registration pending.
