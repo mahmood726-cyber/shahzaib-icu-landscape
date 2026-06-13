@@ -12,7 +12,7 @@ A browser-based **living evidence map** for intensive-care hemodynamic research.
 - Enriches each trial with PubMed citations, OpenAlex bibliometric signal, FAERS adverse-event linkage.
 - Normalises keywords, classifies placebo arms, deduplicates against the reference set, validates the merge incrementally.
 - Maintains a **living update log** recording every refresh cycle's provenance metadata.
-- Achieves 100% sensitivity (95% CI 83.9-100) against a 21-trial reference standard for hemodynamic ICU interventions.
+- Achieves 100% sensitivity (95% CI 83.9-100, Clopper-Pearson exact for 21/21) against a 21-trial reference standard for hemodynamic ICU interventions. This figure is computed by `validate_classification.py` (per-category sensitivity) and `validators.py::validate_recall_reference_standard` (recall against the curated reference NCT IDs); it is not an asserted constant. The 21 reference trials are listed by accession in `ctgov_icu_placebo_strategy.json` (`recall_reference_standard.nct_ids`) and verified against ClinicalTrials.gov — e.g. ProCESS <https://clinicaltrials.gov/study/NCT00510835>, CORTICUS NCT00147004, ATHOS-3 NCT02338843, EOLIA NCT01470703.
 
 ## Install
 
@@ -47,7 +47,7 @@ This fetches fresh CT.gov + enrichment data and writes `data/living_map.json` pl
 python -m pytest -q
 ```
 
-The suite under `dashboard/tests/` and `tests/` validates:
+The suite under `tests/` (plus root-level `test_incremental_merge.py`) validates:
 - Keyword normalisation and placebo classification rules.
 - Deduplication-invariant merge logic.
 - Reference-set sensitivity (the 21-trial benchmark).
@@ -61,7 +61,7 @@ The suite under `dashboard/tests/` and `tests/` validates:
 | `dashboard/` | the interactive dashboard |
 | `build_living_map.py` | top-level pipeline orchestrator |
 | `data/` | pre-computed JSON used by the dashboards |
-| `tests/`, `dashboard/tests/` | pytest unit + integration tests |
+| `tests/`, `test_incremental_merge.py` | pytest unit + integration tests |
 | `F1000_Software_Tool_Article.md` | F1000 submission manuscript |
 | `cover_letter_plos_one.md` | PLOS ONE cover letter (alt submission) |
 | `E156-PROTOCOL.md` | project metadata (E156 entry #152) |
